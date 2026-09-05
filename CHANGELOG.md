@@ -11,7 +11,7 @@
 - 高度資訊：樑深（≥ 30 cm 加重）、天花板淨高、吊燈／吊扇壓床座。
 - GitHub Pages 部署（GitHub Actions，`BASE_PATH` 子路徑、SPA 404 fallback、PWA scope）。
 - 平面圖「底圖」模式：匯入建商平面圖或手繪草圖照片（iPhone 相機可直接拍），點兩個已知距離校正比例後描圖；底圖可調透明度、旋轉、移除。這是 iOS 沒有 WebXR 時的通用替代路徑。
-- iOS AR 供應層抽象（`src/ar/providers.ts`）：以環境變數 `VITE_IOS_XR_PROVIDER`／`VITE_IOS_XR_SDK_URL` 掛載 App Clip 型 WebXR polyfill（如 Variant Launch），掛載後沿用同一套 hit-test 掃描流程。
+- iOS AR：整合 Variant Launch（App Clip 檢視器）。`VITE_VARIANT_LAUNCH_KEY` 設定後，iOS Safari 掃描頁可交棒 Launch 檢視器取得 WebXR hit-test／anchors／DOM overlay，沿用同一套點地板建圖流程；GitHub Pages 工作流由 Secrets 注入 key。AR session 改為只硬性要求 `hit-test`。
 
 ### Changed
 - 部署目標由 Cloud Run 改為 GitHub Pages；Dockerfile 保留作為自架選項。

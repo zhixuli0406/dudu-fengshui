@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 interface ImportMetaEnv {
-  readonly VITE_IOS_XR_PROVIDER?: 'variant-launch' | 'none'
-  readonly VITE_IOS_XR_SDK_URL?: string
+  readonly VITE_VARIANT_LAUNCH_KEY?: string
 }
 interface ImportMeta { readonly env: ImportMetaEnv }

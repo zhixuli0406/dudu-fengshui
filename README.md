@@ -36,7 +36,11 @@ npm run preview  # 預覽 dist
 
 手機測試感測器時，Safari／Chrome 要求安全來源：用 `localhost` 或部署到 HTTPS。最快的方式是 `npx vite --host` 後用 ngrok／Cloudflare Tunnel 建 HTTPS 轉發。
 
-iOS 上的 AR：Safari 原生不支援 WebXR。預設走「底圖描圖」（拍平面圖照片校正比例後描圖）與「相機羅盤疊圖」；若要真正的 AR 點地板建圖，複製 `.env.example` 為 `.env` 填入 App Clip 型供應層的 SDK 網址（見 `docs/research/05-ios-webar-alternatives.md`），掃描頁會出現「在 iPhone 啟動 AR」按鈕。
+iOS 上的 AR：Safari 原生不支援 WebXR。預設走「底圖描圖」（拍平面圖照片校正比例後描圖）與「相機羅盤疊圖」。若要真正的 AR 點地板建圖，用 [Variant Launch](https://launch.variant3d.com)（App Clip 檢視器，免費 Developer 方案每月 3,000 views）：
+
+1. 建立 Launch 專案取得 SDK key，在 Launch Admin 登記精確主機名（GitHub Pages 是 `zhixuli0406.github.io`；localhost 免登記）。
+2. 本機：複製 `.env.example` 為 `.env` 填 `VITE_VARIANT_LAUNCH_KEY`。GitHub Pages：到 repo Settings → Secrets 新增 `VARIANT_LAUNCH_KEY`，工作流會在建置時注入。
+3. iPhone 用 Safari 開掃描頁，按「在 iPhone 啟動 AR（App Clip）」。Launch 檢視器提供 hit-test、anchors、DOM overlay；不提供平面偵測與深度。
 
 ### 操作流程
 

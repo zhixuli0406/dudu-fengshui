@@ -34,8 +34,8 @@ export async function isARSupported(): Promise<boolean> {
 export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks): Promise<ARSessionHandle> {
   const xr = navigator.xr!
   const session = await xr.requestSession('immersive-ar', {
-    requiredFeatures: ['hit-test', 'local-floor'],
-    optionalFeatures: ['dom-overlay', 'plane-detection', 'depth-sensing', 'anchors'],
+    requiredFeatures: ['hit-test'],
+    optionalFeatures: ['local-floor', 'local', 'dom-overlay', 'plane-detection', 'depth-sensing', 'anchors'],
     domOverlay: { root: overlayRoot },
     // depth-sensing init (ignored if unsupported)
     ...({ depthSensing: { usagePreference: ['cpu-optimized'], dataFormatPreference: ['luminance-alpha'] } } as object),
@@ -45,7 +45,9 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
   renderer.setPixelRatio(window.devicePixelRatio)
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.xr.enabled = true
-  renderer.xr.setReferenceSpaceType('local-floor')
+  const enabledEarly = (session as unknown as { enabledFeatures?: string[] }).enabledFeatures ?? []
+  // Variant Launch (iOS) exposes 'local' but not necessarily 'local-floor'; hit-test points are on the floor anyway.
+  renderer.xr.setReferenceSpaceType(enabledEarly.includes('local-floor') || enabledEarly.length === 0 ? 'local-floor' : 'local')
   renderer.domElement.style.position = 'fixed'
   renderer.domElement.style.inset = '0'
   document.body.appendChild(renderer.domElement)

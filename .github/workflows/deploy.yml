@@ -28,6 +28,7 @@ jobs:
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+          VITE_VARIANT_LAUNCH_KEY: ${{ secrets.VARIANT_LAUNCH_KEY }}
       # SPA fallback: GitHub Pages serves 404.html for unknown routes
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3

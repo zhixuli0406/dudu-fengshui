@@ -7,7 +7,7 @@ const loadAR = () => import('../ar/arSession')
 import { useAppStore } from '../store/useAppStore'
 import { useCompass } from '../hooks/useCompass'
 import { polygonArea } from '../engine/geometry'
-import { detectAR, loadIOSProvider, type ARCapability } from '../ar/providers'
+import { detectAR, openInLaunchViewer, type ARCapability } from '../ar/providers'
 
 export function ScanPage() {
   const [supported, setSupported] = useState<boolean | null>(null)
@@ -31,10 +31,14 @@ export function ScanPage() {
   const startIOSProvider = async () => {
     setErr(null); setLoadingProvider(true)
     try {
-      const ok = await loadIOSProvider()
-      if (!ok) { setErr('iOS AR 供應層載入後仍無法取得 WebXR（可能需要先透過 App Clip 開啟）'); return }
-      setSupported(true)
-      await start()
+      const c = await detectAR()
+      setCap(c)
+      if (c.nativeXR) { setSupported(true); await start(); return }
+      if (c.launchStatus === 'launch-required' || c.launchUrl) {
+        if (!openInLaunchViewer(c)) setErr('無法取得 Launch 檢視器連結，請確認 SDK key 與網域已登記')
+        return
+      }
+      setErr(c.launchStatus === 'unsupported' ? '此 iOS 裝置／瀏覽器不支援 Variant Launch（請用 Safari 開啟）' : 'Variant Launch SDK 尚未初始化，請稍後再試或確認網域已在 Launch Admin 登記')
     } catch (e) { setErr((e as Error).message) } finally { setLoadingProvider(false) }
   }
   const start = async () => {
@@ -92,7 +96,8 @@ export function ScanPage() {
         </div>
         {supported === false && cap?.ios && cap.providerConfigured && (
           <div className="mt-3 rounded-xl bg-jade/10 border border-jade/40 p-3 text-xs text-paper/80 leading-relaxed">
-            iOS Safari 原生不支援 WebXR，本站已設定 iOS AR 供應層（{cap.providerName}）：按下方按鈕會透過 App Clip 開啟 AR，之後即可像 Android 一樣點地板轉角建圖。
+            iOS Safari 原生不支援 WebXR，本站已整合 Variant Launch：按下方按鈕會以 App Clip 開啟 Launch 檢視器載入本頁，之後即可像 Android 一樣點地板轉角建圖（支援 hit-test 與 DOM overlay，無平面偵測）。請用 Safari 開啟本頁。
+            {cap.launchStatus && <div className="mt-1 text-paper/50">SDK 狀態：{cap.launchStatus}</div>}
             <div className="mt-2"><Button onClick={startIOSProvider} disabled={loadingProvider}>{loadingProvider ? '載入中…' : '在 iPhone 啟動 AR（App Clip）'}</Button></div>
           </div>
         )}
