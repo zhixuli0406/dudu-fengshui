@@ -51,6 +51,10 @@ src/store/         zustand + localStorage 持久化
 
 依 docs/research 的分歧清單，不硬編單一答案：取向依據、灶位判法為使用者設定；連珠三般卦、死煞分界、兼向門檻、鬼門線廁所等在文案標示「各派有別」；化解物品一律「原則（五行洩化）在前、坊間物品在後」。
 
+## 羅盤方位
+
+`engine/orientation.ts` 依 W3C DeviceOrientation 的 Z-X'-Y'' 旋轉矩陣把 alpha／beta／gamma 轉成世界座標：機頂向量 (0,1,0) 的水平投影 = 平放時的方位（β=γ=0 時退化為 360 − α）；鏡頭向量 (0,0,−1) 的水平投影 = 直立時的方位。`flatness = |m33|` 大於 cos 45° 視為平放。螢幕旋轉：`screen.orientation.angle` 是螢幕相對自然方向的逆時針角度（規範），螢幕「上」的方位 = 機頂方位 + angle（推導：機頂朝西、逆時針轉 90° 後螢幕上方為機身右側，指北）；鏡頭方位不受 UI 旋轉影響。iOS 用 `webkitCompassHeading`（機頂方位）＋同樣的螢幕補償，直立時的行為待實機驗證。
+
 ## AR 分層
 
 - Tier 1：原生 WebXR `immersive-ar` + hit-test（Chrome Android、Samsung Internet、Quest、visionOS Safari）。Chrome 147+ 另用 `plane-detection` 顯示地板並可 `initiateRoomCapture()`。

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { currentScreenAngle, headingFromEuler } from '../engine/orientation'
 
 export type CompassStatus = 'idle' | 'need-permission' | 'active' | 'unsupported' | 'denied'
 
@@ -14,6 +15,8 @@ export interface CompassReading {
   requestPermission: () => Promise<void>
   /** sample count since activation */
   samples: number
+  /** flat = heading of device top; upright = heading of rear camera */
+  mode: 'flat' | 'upright'
 }
 
 interface IOSOrientationEvent extends DeviceOrientationEvent {
@@ -21,15 +24,13 @@ interface IOSOrientationEvent extends DeviceOrientationEvent {
   webkitCompassAccuracy?: number
 }
 
-function screenAngle(): number {
-  const so = (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (typeof window !== 'undefined' && typeof (window as unknown as { orientation?: number }).orientation === 'number' ? (window as unknown as { orientation: number }).orientation : 0)
-  return so
-}
-
 /**
- * Compass heading hook. Uses `webkitCompassHeading` on iOS (already true magnetic heading, 0 = north),
- * `deviceorientationabsolute` on Android/Chrome (alpha is counter-clockwise from north → heading = 360 − alpha),
- * and corrects for screen rotation. Applies light exponential smoothing on the unit circle.
+ * Compass heading hook.
+ * - iOS: `webkitCompassHeading` (magnetic heading of the device top, 0 = north) + screen rotation.
+ *   [未實機驗證] 直立時 iOS 是否自動改以機背方向計算，需實機確認。
+ * - Android/Chrome: `deviceorientationabsolute` alpha/beta/gamma → rotation matrix; flat → device-top heading
+ *   (+ screen rotation), upright → rear-camera heading (spec appendix formula NaNs when flat, so both are derived).
+ * Applies light exponential smoothing on the unit circle.
  */
 export function useCompass(): CompassReading {
   const [heading, setHeading] = useState<number | null>(null)
@@ -37,6 +38,7 @@ export function useCompass(): CompassReading {
   const [absolute, setAbsolute] = useState(false)
   const [status, setStatus] = useState<CompassStatus>('idle')
   const [samples, setSamples] = useState(0)
+  const [mode, setMode] = useState<'flat' | 'upright'>('flat')
   const smooth = useRef<{ x: number; y: number } | null>(null)
 
   const onEvent = useCallback((e: DeviceOrientationEvent) => {
@@ -47,11 +49,13 @@ export function useCompass(): CompassReading {
       h = ev.webkitCompassHeading
       abs = true
       if (typeof ev.webkitCompassAccuracy === 'number') setAccuracy(ev.webkitCompassAccuracy < 0 ? null : ev.webkitCompassAccuracy)
-      // iOS: webkitCompassHeading is relative to the device top regardless of screen orientation? It follows device; correct for screen rotation.
-      h = (h + screenAngle() + 360) % 360
+      h = (h + currentScreenAngle() + 360) % 360
+      if (typeof ev.beta === 'number' && typeof ev.gamma === 'number') setMode(headingFromEuler(0, ev.beta, ev.gamma).mode)
     } else if (typeof ev.alpha === 'number') {
       abs = ev.absolute === true || e.type === 'deviceorientationabsolute'
-      h = (360 - ev.alpha + screenAngle() + 360) % 360
+      const r = headingFromEuler(ev.alpha, ev.beta ?? 0, ev.gamma ?? 0, currentScreenAngle())
+      h = r.heading
+      setMode(r.mode)
     }
     if (h === null) return
     // smoothing on unit circle
@@ -106,5 +110,5 @@ export function useCompass(): CompassReading {
     }
   }, [attach, onEvent])
 
-  return { heading, accuracy, absolute, status, requestPermission, samples }
+  return { heading, accuracy, absolute, status, requestPermission, samples, mode }
 }

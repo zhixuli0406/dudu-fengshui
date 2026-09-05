@@ -15,6 +15,7 @@
 
 ### Changed
 - 部署目標由 Cloud Run 改為 GitHub Pages；Dockerfile 保留作為自架選項。
+- 羅盤方位改以 W3C 旋轉矩陣計算：平放取機頂方向（＋螢幕旋轉角，`screen.orientation.angle` 為逆時針、公式 heading + angle 依規範推導並測試），直立（相機模式）取鏡頭方向；不再用只在平放時正確的 360 − alpha。
 
 ## [0.1.0] - 2026-09-05
 

@@ -62,7 +62,7 @@ export function CompassPage() {
           </div>
           <div className="text-right space-y-1">
             {compass.accuracy != null && <Badge tone={compass.accuracy <= 15 ? 'green' : 'red'}>精度 ±{Math.round(compass.accuracy)}°</Badge>}
-            {compass.status === 'active' && <div><Badge tone={compass.absolute ? 'green' : 'gray'}>{compass.absolute ? '磁力計' : '相對值'}</Badge></div>}
+            {compass.status === 'active' && <div><Badge tone={compass.absolute ? 'green' : 'gray'}>{compass.absolute ? '磁力計' : '相對值'}</Badge> <Badge tone="gray">{compass.mode === 'flat' ? '平放：機頂方向' : '直立：鏡頭方向'}</Badge></div>}
             {locked != null && <div><Badge tone="gold">已鎖定</Badge></div>}
           </div>
         </div>
