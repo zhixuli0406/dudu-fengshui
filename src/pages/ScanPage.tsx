@@ -1,9 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Badge } from '../components/ui'
 import type { ARPoint, ARSessionHandle } from '../ar/arSession'
 
 const loadAR = () => import('../ar/arSession')
+
+/** DOM overlay root outside React's tree (Variant Launch hides every sibling of the overlay root). */
+function getOverlayRoot(): HTMLElement {
+  let el = document.getElementById('ar-overlay-root')
+  if (!el) { el = document.createElement('div'); el.id = 'ar-overlay-root'; document.body.appendChild(el) }
+  return el
+}
 import { useAppStore } from '../store/useAppStore'
 import { useCompass } from '../hooks/useCompass'
 import { polygonArea } from '../engine/geometry'
@@ -18,8 +26,10 @@ export function ScanPage() {
   const [pts, setPts] = useState<ARPoint[]>([])
   const [features, setFeatures] = useState<{ planeDetection: boolean; depth: boolean } | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const [trackingHint, setTrackingHint] = useState<string | null>(null)
   const handle = useRef<ARSessionHandle | null>(null)
-  const overlay = useRef<HTMLDivElement>(null)
+  const overlayRoot = useRef<HTMLElement | null>(null)
+  if (typeof document !== 'undefined' && !overlayRoot.current) overlayRoot.current = getOverlayRoot()
   const startHeading = useRef<number | null>(null)
   const compass = useCompass()
   const { setPlan, plan, setHouse } = useAppStore()
@@ -46,10 +56,11 @@ export function ScanPage() {
     try {
       startHeading.current = compass.heading
       const { startARSession } = await loadAR()
-      const h = await startARSession(overlay.current!, {
+      const h = await startARSession(overlayRoot.current!, {
         onPoints: setPts,
         onStatus: setStatus,
         onFeatures: setFeatures,
+        onTracking: setTrackingHint,
         onEnd: () => { setRunning(false); handle.current = null },
       })
       handle.current = h
@@ -118,20 +129,24 @@ export function ScanPage() {
         {err && <div className="text-xs text-red-300 mt-2">{err}</div>}
       </Card>
 
-      {/* DOM overlay root, shown in AR */}
-      <div ref={overlay} className={running ? 'fixed inset-0 z-50 pointer-events-none' : 'hidden'}>
-        <div className="absolute top-4 inset-x-4 rounded-xl bg-black/60 text-paper text-sm p-3 pointer-events-auto">
-          <div>{status}</div>
-          <div className="text-xs text-paper/70 mt-1">轉角 {pts.length} 個{area > 0 && ` · 約 ${area.toFixed(1)} m²`}</div>
-        </div>
-        <div className="absolute bottom-8 inset-x-4 flex gap-2 pointer-events-auto">
-          <button className="flex-1 rounded-xl bg-black/70 text-paper py-3" onClick={() => handle.current?.undo()}>退一步</button>
-          {features?.planeDetection && <button className="flex-1 rounded-xl bg-black/70 text-paper py-3" onClick={async () => { const ok = await handle.current?.roomCapture(); if (!ok) useDetectedFloor() }}>掃房間</button>}
-          {features?.planeDetection && <button className="flex-1 rounded-xl bg-black/70 text-paper py-3" onClick={useDetectedFloor}>用偵測到的地板</button>}
-          <button className="flex-1 rounded-xl bg-gold text-ink font-semibold py-3" onClick={finish} disabled={pts.length < 3}>完成（{pts.length}）</button>
-          <button className="rounded-xl bg-black/70 text-paper px-4 py-3" onClick={() => handle.current?.end()}>取消</button>
-        </div>
-      </div>
+      {/* DOM overlay UI, portaled into a root outside React's tree */}
+      {running && overlayRoot.current && createPortal(
+        <>
+          <div className="absolute top-4 inset-x-4 rounded-xl bg-black/60 text-paper text-sm p-3">
+            <div>{status}</div>
+            {trackingHint && <div className="text-xs text-amber-300 mt-1">{trackingHint}</div>}
+            <div className="text-xs text-paper/70 mt-1">轉角 {pts.length} 個{area > 0 && ` · 約 ${area.toFixed(1)} m²`}</div>
+          </div>
+          <div className="absolute bottom-8 inset-x-4 flex gap-2">
+            <button className="flex-1 rounded-xl bg-black/70 text-paper py-3" onClick={() => handle.current?.undo()}>退一步</button>
+            {features?.planeDetection && <button className="flex-1 rounded-xl bg-black/70 text-paper py-3" onClick={async () => { const ok = await handle.current?.roomCapture(); if (!ok) useDetectedFloor() }}>掃房間</button>}
+            {features?.planeDetection && <button className="flex-1 rounded-xl bg-black/70 text-paper py-3" onClick={useDetectedFloor}>用偵測到的地板</button>}
+            <button className="flex-1 rounded-xl bg-gold text-ink font-semibold py-3" onClick={finish} disabled={pts.length < 3}>完成（{pts.length}）</button>
+            <button className="rounded-xl bg-black/70 text-paper px-4 py-3" onClick={() => handle.current?.end()}>取消</button>
+          </div>
+        </>,
+        overlayRoot.current,
+      )}
     </div>
   )
 }

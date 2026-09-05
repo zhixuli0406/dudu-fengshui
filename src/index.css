@@ -24,3 +24,8 @@ body { background: var(--color-ink); color: var(--color-paper); font-family: var
 .safe-b { padding-bottom: env(safe-area-inset-bottom); }
 .safe-t { padding-top: env(safe-area-inset-top); }
 .touch-none { touch-action: none; }
+/* During an AR session the camera feed may be rendered behind the page (Variant Launch on iOS). */
+html.ar-active, html.ar-active body, html.ar-active #root { background: transparent !important; }
+html.ar-active #root > * { visibility: hidden; }
+#ar-overlay-root { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
+#ar-overlay-root > * { pointer-events: auto; }

@@ -4,7 +4,7 @@
 > 對象專案：`dudu-fengshui`（Vite 8 + React 19.2 + TypeScript 6 + three.js 0.185，純靜態 PWA，部署 GitHub Pages 子路徑 `/dudu-fengshui/`）
 > 問題：Android Chrome 已用 WebXR `immersive-ar` + hit-test 完成「點地板轉角建平面圖」；**iOS Safari 不支援 WebXR**，需要替代路徑。
 > 方法：一手來源（官方文件、定價頁、GitHub API、npm registry、CDN 實測位元組、規範原文）。凡推論必標記，凡查不到必列入 §8。
-> 前置：iOS Safari 不支援 WebXR 的完整證據鏈已在 [`04-web-spatial-tech.md` §2.1](./04-web-spatial-tech.md) 建立，本文不重複，只做 2026-09 的複查（見 §4.5）。
+> 前置：iOS Safari 不支援 WebXR 的完整證據鏈已在 [`04-web-spatial-tech.md` §2.1](./04-web-spatial-tech.md) 建立，本文不重複，只做 2026-09 的複查（見 §3.5）。
 
 ---
 
@@ -23,7 +23,7 @@
 | ⑤ Zappar / Mattercraft | Dev $12.99/月**非商用**；Pro $315/月 | ❌ **自架僅 Enterprise**；`github.io` 不在授權白名單 | ⚠️ instant world tracking，非真平面 hit-test | 高（r3f wrapper **不相容 React 19**） | ✖ 排除 |
 | ⑥ Onirix | 見 §3.2 | 見 §3.2 | 見 §3.2 | — | 見 §3.2 |
 | ⑦ AR Quick Look / RoomPlan | $0 | — | ❌ **無任何 web 端資料回傳管道** | — | ✖ 技術上不可能 |
-| ⑧ 等 iOS Safari 支援 WebXR | — | — | — | — | ✖ 見 §4.5 |
+| ⑧ 等 iOS Safari 支援 WebXR | — | — | — | — | ✖ 見 §3.5 |
 
 ### 0.2 建議
 
@@ -33,7 +33,7 @@
 
 **保底：拍照＋手動點角。** 沒有任何第三方相依、任何裝置都能跑，精度換覆蓋率。風水盤位對「房間長寬比與朝向」的敏感度遠低於對「朝向角度」的敏感度，這條路的誤差多半可接受。
 
-**明確排除：** Zappar（不能自架、React 19 不相容、非商用授權）、AR Quick Look/RoomPlan（無回傳管道）、等 Apple（見 §4.5）。
+**明確排除：** Zappar（不能自架、React 19 不相容、非商用授權）、AR Quick Look/RoomPlan（無回傳管道）、等 Apple（見 §3.5）。
 
 ---
 ## 1. Variant Launch（launch.variant3d.com）

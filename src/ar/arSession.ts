@@ -21,6 +21,8 @@ export interface ARSessionHandle {
 export interface ARCallbacks {
   onPoints: (pts: ARPoint[]) => void
   onStatus: (msg: string) => void
+  /** ARKit tracking quality (Variant Launch `vlaunch-ar-tracking`) mapped to a user hint; null = normal */
+  onTracking?: (hint: string | null) => void
   onEnd: () => void
   /** whether plane-detection feature was granted */
   onFeatures?: (f: { planeDetection: boolean; depth: boolean }) => void
@@ -40,6 +42,22 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
     // depth-sensing init (ignored if unsupported)
     ...({ depthSensing: { usagePreference: ['cpu-optimized'], dataFormatPreference: ['luminance-alpha'] } } as object),
   } as XRSessionInit)
+
+  // iOS (Variant Launch) renders the camera behind the page: everything above must be transparent.
+  document.documentElement.classList.add('ar-active')
+  const TRACKING_HINT: Record<string, string | null> = {
+    normal: null,
+    'not-available': '追蹤尚未啟動，請緩慢移動手機',
+    'limited-initializing': '初始化中，請緩慢左右移動手機',
+    'limited-excessive-motion': '移動太快，請放慢',
+    'limited-insufficient-features': '地面特徵不足，請對準有紋理的地板、踢腳線或家具邊緣',
+    'limited-relocalizing': '重新定位中，請回到剛才掃描過的位置',
+  }
+  const onTracking = (e: Event) => {
+    const state = (e as CustomEvent<{ state?: string }>).detail?.state ?? ''
+    cb.onTracking?.(TRACKING_HINT[state] ?? (state ? `追蹤狀態：${state}` : null))
+  }
+  document.addEventListener('vlaunch-ar-tracking', onTracking)
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(window.devicePixelRatio)
@@ -147,6 +165,8 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
   })
 
   const cleanup = () => {
+    document.documentElement.classList.remove('ar-active')
+    document.removeEventListener('vlaunch-ar-tracking', onTracking)
     renderer.setAnimationLoop(null)
     controller.removeEventListener('select', onSelect)
     renderer.dispose()

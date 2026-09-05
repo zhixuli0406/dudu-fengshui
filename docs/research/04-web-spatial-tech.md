@@ -308,7 +308,10 @@ const headingDevice = isIOS ? e.webkitCompassHeading : (360 - e.alpha) % 360;
 const headingScreen = (headingDevice - (screen.orientation?.angle ?? 0) + 360) % 360;
 ```
 
-> ⚠️ **這條修正式的正負號是推導而非引用**（W3C 沒有給這條公式）。推導依據：`angle` 為螢幕相對機身**逆時針**旋轉度數，而羅盤方位**順時針**遞增，故取減號；方向與 three.js 的 `setFromAxisAngle(_zee, -orient)` 一致。**務必實機驗證。**
+> 🔴 **上面這條公式的正負號是錯的，已由 [`05-ios-webar-alternatives.md` §5](./05-ios-webar-alternatives.md) 更正為 `+ angle`。**
+> 正確版本：`const headingScreen = (headingDevice + (screen.orientation?.angle ?? 0)) % 360`
+> 更正依據（2026-09-05 查證）：AOSP `Display.java`（機身逆時針轉 90° → `ROTATION_90`）、Chromium `DisplayAndroid.getRotationDegrees()`、WebKit `WKWebViewIOS.mm` + `WebPageProxyIOS.mm` + `ScreenOrientation.cpp`、Apple `UIInterfaceOrientation.landscapeRight`（Home 鍵在右＝機身逆時針）。
+> 原本的錯誤來源：把 three.js `setFromAxisAngle(_zee, -orient)` 與 W3C 感測器 polyfill 的 `-angle` 直接搬進 bearing 公式。那個負號是**座標系旋轉量**（右手系，逆時針為正），而 bearing 是**順時針**遞增，換算時必須翻號。詳細推導與實機驗證步驟見 05 文件 §5.4。
 > **最省事的做法：把 app 鎖成 portrait**（或把錶盤畫在裝置座標系），這條修正就完全不需要，也就沒有正負號 bug 的風險。
 
 ### 1.7 桌機／無感測器的 fallback

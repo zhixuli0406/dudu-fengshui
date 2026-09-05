@@ -58,7 +58,7 @@ src/store/         zustand + localStorage 持久化
 ## AR 分層
 
 - Tier 1：原生 WebXR `immersive-ar` + hit-test（Chrome Android、Samsung Internet、Quest、visionOS Safari）。Chrome 147+ 另用 `plane-detection` 顯示地板並可 `initiateRoomCapture()`。
-- Tier 2：iOS 用 Variant Launch。`main.tsx` 在 iOS 且 `VITE_VARIANT_LAUNCH_KEY` 存在時提早注入 `https://launchar.app/sdk/v1?key=…`（不帶 `redirect=true`，由掃描頁決定何時交棒）；SDK 觸發 `vlaunch-initialized`，`detail.webXRStatus` 為 `supported`（已在 Launch 檢視器內，直接走 Tier 1）／`launch-required`（按鈕以 `launchUrl` 交棒 App Clip）／`unsupported`。`startARSession` 只硬性要求 `hit-test`，`local-floor` 為選配（Launch 檢視器可能只給 `local`），參考空間依 `session.enabledFeatures` 決定。Zappar 因自架僅限 Enterprise 且 github.io 不在授權白名單而排除。
+- Tier 2：iOS 用 Variant Launch。`main.tsx` 在 iOS 且 `VITE_VARIANT_LAUNCH_KEY` 存在時提早注入 `https://launchar.app/sdk/v1?key=…`（不帶 `redirect=true`，由掃描頁決定何時交棒）；SDK 觸發 `vlaunch-initialized`，`detail.webXRStatus` 為 `supported`（已在 Launch 檢視器內，直接走 Tier 1）／`launch-required`（按鈕以 `launchUrl` 交棒 App Clip）／`unsupported`。`startARSession` 只硬性要求 `hit-test`，`local-floor` 為選配（Launch 檢視器可能只給 `local`），參考空間依 `session.enabledFeatures` 決定。Variant Launch 的 DOM overlay 是「隱藏 overlay root 以外所有元素」模擬的，故 overlay root 為 React 樹外的 `#ar-overlay-root`，UI 以 `createPortal` 渲染；session 期間 `html.ar-active` 讓 body／#root 背景透明（iOS 相機在網頁後方）；`vlaunch-ar-tracking` 狀態轉成中文提示（特徵不足→對準有紋理地面）。Zappar 因自架僅限 Enterprise 且 github.io 不在授權白名單而排除；8th Wall（2026 起開源免費、可自架）為第二 fallback，但需 6.6 MB 與另一套 renderer 管線、尺度需使用者校正，故未整合。
 - Tier 3：`FloorPlan.underlay` 照片底圖（縮圖 ≤ 1600px JPEG 存 localStorage）＋兩點比例校正；以及相機羅盤疊圖。全平台可用。
 
 ## 多樓層
