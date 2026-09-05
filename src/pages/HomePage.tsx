@@ -1,71 +1,72 @@
 import { Link } from 'react-router-dom'
+import { ArrowRight, Check, Compass, FileText, LayoutGrid, Trees, Users } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
-import { Card, Badge } from '../components/ui'
+import { Page } from '../components/AppShell'
+import { Button } from '../components/mds'
 import { fengshuiYearOf } from '../engine/calendar'
 import { periodOfYear } from '../engine/xuankong'
 import { annualAfflictions, palaceLabel } from '../engine/annual'
+import { cn } from '../lib/utils'
 
 export function HomePage() {
   const persons = useAppStore((s) => s.persons)
   const house = useAppStore((s) => s.house)
-  const plan = useAppStore((s) => s.plan)
+  const floors = useAppStore((s) => s.floors)
+  const environment = useAppStore((s) => s.environment)
   const fy = fengshuiYearOf(new Date())
   const period = periodOfYear(fy.year)
   const a = annualAfflictions(fy.year)
+  const hasPlan = floors.some((f) => f.outline.length >= 3 && f.items.length > 0)
   const steps = [
-    { to: '/setup', title: '1. 基本資料', desc: '家庭成員出生年、性別，入住年份', done: persons.length > 0 },
-    { to: '/compass', title: '2. 量測坐向', desc: '站在大門內朝外，用羅盤鎖定朝向', done: house.facingSource !== 'none' },
-    { to: '/plan', title: '3. 繪製平面圖', desc: '畫外牆與房間，放上門、床、灶、桌', done: plan.outline.length >= 3 && plan.items.length > 0 },
-    { to: '/report', title: '4. 看報告', desc: '八宅、玄空飛星、流年、形勢四合一', done: false },
+    { to: '/setup', title: '家庭成員與房屋', desc: persons.length ? `${persons.length} 位成員，朝向 ${Math.round(house.facingBearing)}°` : '出生年、性別、建成年', done: persons.length > 0 && house.facingSource !== 'none', icon: Users },
+    { to: '/plan', title: '平面圖', desc: hasPlan ? `${floors.length} 個樓層` : '掃描、拍照描圖或手繪', done: hasPlan, icon: LayoutGrid },
+    { to: '/environment', title: '屋外環境', desc: Object.keys(environment).length ? `已答 ${Object.keys(environment).length} 題` : '路沖、壁刀、電塔等勾選', done: Object.keys(environment).length > 0, icon: Trees },
+    { to: '/report', title: '分析報告', desc: '八宅、飛星、流年、形勢', done: false, icon: FileText },
   ]
+  const next = steps.find((s) => !s.done) ?? steps[3]!
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto safe-t">
-      <header className="pt-4 pb-2">
-        <h1 className="font-serif text-3xl font-bold text-gold">嘟嘟風水</h1>
-        <p className="text-paper/70 text-sm mt-1">八宅 × 玄空飛星 × 形勢派，一站式室內風水分析與建議。手機可用羅盤與 AR 掃描。</p>
+    <Page className="space-y-6 pt-6">
+      <header>
+        <h1 className="text-2xl font-semibold">嘟嘟風水</h1>
+        <p className="mt-1 text-sm text-muted-foreground">量朝向、畫平面圖，得到八宅、玄空飛星與形勢派的室內風水判讀。資料只留在你的手機。</p>
       </header>
 
-      <Card title={`${fy.year} ${fy.ganzhi}年 · 下元${period}運`}>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-lg bg-ink p-2"><Badge tone="red">五黃</Badge> <span className="ml-1">{palaceLabel(a.wuhuang)}</span></div>
-          <div className="rounded-lg bg-ink p-2"><Badge tone="red">二黑</Badge> <span className="ml-1">{palaceLabel(a.erhei)}</span></div>
-          <div className="rounded-lg bg-ink p-2"><Badge tone="gold">八白財</Badge> <span className="ml-1">{palaceLabel(a.babai)}</span></div>
-          <div className="rounded-lg bg-ink p-2"><Badge tone="gold">九紫喜</Badge> <span className="ml-1">{palaceLabel(a.jiuzi)}</span></div>
-          <div className="rounded-lg bg-ink p-2 col-span-2"><Badge tone="blue">太歲</Badge> <span className="ml-1">{a.taisui.taisuiMountain}山（{a.taisui.zodiac}）· 歲破 {a.taisui.suipoMountain}山 · 三煞 {a.taisui.sanshaBranches.join('')}</span></div>
-        </div>
-      </Card>
+      <Link to={next.to} className="block rounded-xl bg-brand p-4 text-brand-foreground shadow-[var(--surface-shadow)] active:translate-y-px">
+        <div className="text-xs opacity-80">下一步</div>
+        <div className="mt-0.5 flex items-center justify-between text-base font-medium">{next.title}<ArrowRight className="size-5" /></div>
+      </Link>
 
-      <div className="space-y-2">
-        {steps.map((s) => (
-          <Link key={s.to} to={s.to} className="flex items-center gap-3 rounded-2xl bg-ink-2 border border-ink-3/60 p-4 hover:border-gold/50">
-            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${s.done ? 'bg-jade text-paper' : 'bg-ink-3 text-paper/60'}`}>{s.done ? '✓' : '·'}</span>
-            <div className="flex-1">
-              <div className="font-semibold">{s.title}</div>
-              <div className="text-xs text-paper/60">{s.desc}</div>
-            </div>
-            <span className="text-paper/40">›</span>
-          </Link>
+      <ol className="divide-y divide-surface-border rounded-xl border border-surface-border bg-surface">
+        {steps.map((s, i) => (
+          <li key={s.to}>
+            <Link to={s.to} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-hover">
+              <span className={cn('flex size-7 items-center justify-center rounded-full text-xs font-medium', s.done ? 'bg-brand text-brand-foreground' : 'bg-muted text-muted-foreground')}>{s.done ? <Check className="size-4" /> : i + 1}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{s.title}</span>
+                <span className="block truncate text-xs text-muted-foreground">{s.desc}</span>
+              </span>
+              <s.icon className="size-4 text-muted-foreground" strokeWidth={1.75} />
+            </Link>
+          </li>
         ))}
-      </div>
+      </ol>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Link to="/environment" className="rounded-2xl bg-ink-2 border border-ink-3/60 p-4 hover:border-gold/50">
-          <div className="text-2xl">🏙️</div>
-          <div className="font-semibold mt-1">外局問卷</div>
-          <div className="text-xs text-paper/60">路沖、壁刀、天斬等屋外環境勾選</div>
-        </Link>
-        <Link to="/scan" className="rounded-2xl bg-ink-2 border border-ink-3/60 p-4 hover:border-gold/50">
-          <div className="text-2xl">📡</div>
-          <div className="font-semibold mt-1">AR 空間掃描</div>
-          <div className="text-xs text-paper/60">Android Chrome 可用 WebXR 點地板角落自動建圖</div>
-        </Link>
-        <Link to="/knowledge" className="rounded-2xl bg-ink-2 border border-ink-3/60 p-4 hover:border-gold/50">
-          <div className="text-2xl">📚</div>
-          <div className="font-semibold mt-1">風水知識庫</div>
-          <div className="text-xs text-paper/60">八宅、飛星、二十四山、化解物查表</div>
-        </Link>
+      <section>
+        <h2 className="text-sm font-medium">{fy.year} {fy.ganzhi}年，{period} 運</h2>
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+          <dt className="text-muted-foreground">五黃</dt><dd>{palaceLabel(a.wuhuang)}</dd>
+          <dt className="text-muted-foreground">二黑</dt><dd>{palaceLabel(a.erhei)}</dd>
+          <dt className="text-muted-foreground">八白財星</dt><dd>{palaceLabel(a.babai)}</dd>
+          <dt className="text-muted-foreground">九紫喜慶</dt><dd>{palaceLabel(a.jiuzi)}</dd>
+          <dt className="text-muted-foreground">太歲</dt><dd>{a.taisui.taisuiMountain}山（{a.taisui.zodiac}年），三煞 {a.taisui.sanshaBranches.join('')}</dd>
+        </dl>
+      </section>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Link to="/compass"><Button variant="outline" className="w-full"><Compass />羅盤量向</Button></Link>
+        <Link to="/knowledge"><Button variant="outline" className="w-full">知識庫</Button></Link>
       </div>
-      <p className="text-[11px] text-paper/40 leading-relaxed">本工具依傳統風水典籍與坊間通則整理，屬文化參考，不構成任何醫療、法律或投資建議。各派說法不一之處已標示「各派有別」。</p>
-    </div>
+      <p className="text-xs text-muted-foreground">文化參考，不構成醫療、法律或投資建議。<Link to="/privacy" className="underline underline-offset-2">隱私與免責</Link></p>
+    </Page>
   )
 }

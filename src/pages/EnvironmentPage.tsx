@@ -1,43 +1,42 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Badge, Card } from '../components/ui'
+import { Page, PageHeader } from '../components/AppShell'
+import { Badge, Button } from '../components/mds'
 import { useAppStore } from '../store/useAppStore'
 import questions from '../data/environmentQuestions.json'
 import { environmentFindings, type EnvironmentQuestion } from '../engine/environment'
+import { cn } from '../lib/utils'
 
 const QS = questions as EnvironmentQuestion[]
 
 export function EnvironmentPage() {
   const environment = useAppStore((s) => s.environment as Record<string, string | boolean | undefined>)
   const setEnv = useAppStore((s) => s.setEnvironmentOption)
-  const groups = useMemo(() => { const g = new Map<string, EnvironmentQuestion[]>(); for (const q of QS) g.set(q.group, [...(g.get(q.group) ?? []), q]); return [...g.entries()] }, [])
   const findings = useMemo(() => environmentFindings(environment, QS), [environment])
+  const answered = QS.filter((q) => environment[q.id]).length
   return (
-    <div className="p-4 space-y-4 max-w-2xl mx-auto safe-t">
-      <div className="flex items-center justify-between pt-2">
-        <h1 className="font-serif text-2xl font-bold text-gold">外局問卷</h1>
-        <Badge tone={findings.length ? 'red' : 'green'}>{findings.length} 項外煞</Badge>
-      </div>
-      <p className="text-sm text-paper/70">屋外環境（路沖、壁刀、天斬煞、高壓電塔等）無法從平面圖判定，請就實際狀況勾選。勾選結果會併入報告的「形勢」分頁。<Link to="/report" className="text-gold underline ml-1">看報告</Link></p>
-      {groups.map(([g, qs]) => (
-        <Card key={g} title={g}>
-          <ul className="space-y-3">
-            {qs.map((q) => (
-              <li key={q.id}>
-                <div className="text-sm">{q.question}</div>
-                <div className="flex flex-wrap gap-1 mt-1">
+    <>
+      <PageHeader title="屋外環境" subtitle={`第 3 步，已答 ${answered} / ${QS.length}`} right={findings.length ? <Badge variant="destructive">{findings.length} 項外煞</Badge> : undefined} />
+      <Page className="space-y-6">
+        <p className="text-sm text-muted-foreground">屋外環境無法從平面圖判定，請就實際狀況勾選。不確定的題目可以跳過。</p>
+        <ol className="space-y-5">
+          {QS.map((q, i) => {
+            const hit = findings.find((f) => f.ruleId === `env_${q.id}`)
+            return (
+              <li key={q.id} className="rounded-xl border border-surface-border bg-surface p-4">
+                <div className="text-sm"><span className="mr-1 text-muted-foreground">{i + 1}.</span>{q.question}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {q.options.map((o) => (
-                    <button key={o} onClick={() => setEnv(q.id, o)} className={`px-2 py-1 rounded-md text-xs ${environment[q.id] === o ? 'bg-gold text-ink font-semibold' : 'bg-ink text-paper/80'}`}>{o}</button>
+                    <button key={o} onClick={() => setEnv(q.id, o)} className={cn('rounded-lg border px-2.5 py-1.5 text-xs transition-colors', environment[q.id] === o ? 'border-brand bg-brand/10 text-foreground' : 'border-border text-muted-foreground hover:bg-muted')}>{o}</button>
                   ))}
                 </div>
-                {environment[q.id] && findings.some((f) => f.ruleId === `env_${q.id}`) && (
-                  <div className="mt-1 text-xs text-paper/60">{q.explanation.slice(0, 120)}{q.explanation.length > 120 ? '…' : ''}<br /><span className="text-gold/80">化解：{q.remedy.slice(0, 100)}</span></div>
-                )}
+                {hit && <div className="mt-2 border-t border-surface-border pt-2 text-xs text-muted-foreground">{q.explanation.slice(0, 140)}{q.explanation.length > 140 ? '…' : ''}<div className="mt-1 text-foreground">化解：{q.remedy.slice(0, 120)}</div></div>}
               </li>
-            ))}
-          </ul>
-        </Card>
-      ))}
-    </div>
+            )
+          })}
+        </ol>
+        <Link to="/report"><Button variant="brand" size="lg" className="w-full">下一步：看報告</Button></Link>
+      </Page>
+    </>
   )
 }

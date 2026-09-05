@@ -30,6 +30,10 @@ src/pages/         Home / Setup / Compass / Plan / Scan / Report / Knowledge
 src/store/         zustand + localStorage 持久化
 ```
 
+## 設計系統
+
+沿用 DuDuClaw MDS：`src/index.css` 定義 OKLCH 語義 token（`--app-shell`／`--page-canvas`／`--surface`／`--surface-raised` 四層、`--brand` 玉綠同時作為「吉」、`--destructive` 玫紅作為「凶」、五行色只用於宮位淡色），`@theme inline` 映射成 Tailwind utility；dark 走 `.dark` class（main.tsx 依 `prefers-color-scheme` 切換）。元件在 `src/components/mds/`（button／badge／card／input／segmented／empty／field），頁面只組合元件；圖示用 lucide-react 具名匯入，禁 emoji；字重只用 400／500。`AppShell` 提供固定底部導覽（首頁／資料／平面圖／報告／更多）與 `PageHeader`。
+
 ## 座標與方位約定
 
 - 平面圖座標：公分，螢幕座標系（x 向右、y 向下）。
@@ -54,6 +58,10 @@ src/store/         zustand + localStorage 持久化
 ## 羅盤方位
 
 `engine/orientation.ts` 依 W3C DeviceOrientation 的 Z-X'-Y'' 旋轉矩陣把 alpha／beta／gamma 轉成世界座標：機頂向量 (0,1,0) 的水平投影 = 平放時的方位（β=γ=0 時退化為 360 − α）；鏡頭向量 (0,0,−1) 的水平投影 = 直立時的方位。`flatness = |m33|` 大於 cos 45° 視為平放。螢幕旋轉：`screen.orientation.angle` 是螢幕相對自然方向的逆時針角度（規範），螢幕「上」的方位 = 機頂方位 + angle（推導：機頂朝西、逆時針轉 90° 後螢幕上方為機身右側，指北）；鏡頭方位不受 UI 旋轉影響。iOS 用 `webkitCompassHeading`（機頂方位）＋同樣的螢幕補償，直立時的行為待實機驗證。
+
+## AR 掃描流程
+
+`startARSession` 以階段狀態機捕捉：`outline`（外牆多邊形）→ `room`（每個房間一個多邊形，帶類型標籤）→ `opening`（大門／房門／窗的點）。overlay root 掛 `beforexrselect` 阻止 UI 點擊觸發 XR `select`。Chrome 平面偵測時，水平面取最大且高度 < 0.4 m 者為地板，垂直面投影成牆線供小地圖參考。`ScanPage.finish()` 把多邊形轉成 cm、以外牆最小點歸零、修正為順時針，門窗依最近外牆邊取法線（朝屋內）作為 facing，大門存在時以其反向＋北偏角設定房屋朝向。
 
 ## AR 分層
 

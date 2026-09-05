@@ -41,11 +41,16 @@ interface AppState {
   settings: Settings
   /** 外局問卷答案 */
   environment: Record<string, boolean | string>
+  /** ISO time the user accepted the data notice */
+  consentedAt?: string
+  setConsent: () => void
   addPerson: (p: Omit<Person, 'id'>) => void
   updatePerson: (id: string, patch: Partial<Person>) => void
   removePerson: (id: string) => void
   setHouse: (patch: Partial<HouseState>) => void
   setPlan: (plan: FloorPlan) => void
+  /** replace all floors (e.g. demo or scan import) */
+  setFloors: (floors: FloorPlan[]) => void
   updatePlan: (fn: (plan: FloorPlan) => FloorPlan) => void
   setActiveFloor: (index: number) => void
   addFloor: (opts?: { copyOutline?: boolean; level?: number; name?: string }) => void
@@ -87,6 +92,7 @@ export const useAppStore = create<AppState>()(
       removePerson: (id) => set((s) => ({ persons: s.persons.filter((p) => p.id !== id) })),
       setHouse: (patch) => set((s) => ({ house: { ...s.house, ...patch } })),
       setPlan: (plan) => set((s) => withPlan(s, (p) => ({ ...plan, name: plan.name ?? p.name, level: plan.level ?? p.level }))),
+      setFloors: (floors) => set({ floors, activeFloor: 0, plan: floors[0] ?? emptyPlan() }),
       updatePlan: (fn) => set((s) => withPlan(s, fn)),
       setActiveFloor: (index) => set((s) => (s.floors[index] ? { activeFloor: index, plan: s.floors[index]! } : {})),
       addFloor: (opts = {}) => set((s) => {
@@ -119,7 +125,8 @@ export const useAppStore = create<AppState>()(
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
       setEnvironment: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
       setEnvironmentOption: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
-      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {} }),
+      setConsent: () => set({ consentedAt: new Date().toISOString() }),
+      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {}, consentedAt: undefined }),
     }),
     {
       name: 'dudu-fengshui-v1',

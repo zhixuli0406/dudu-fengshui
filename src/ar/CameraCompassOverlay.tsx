@@ -30,27 +30,27 @@ export function CameraCompassOverlay({ heading, onClose }: { heading: number | n
   return (
     <div className="relative rounded-2xl overflow-hidden bg-black aspect-[3/4] max-h-[70vh]">
       <video ref={video} playsInline muted className="absolute inset-0 w-full h-full object-cover" />
-      {err && <div className="absolute inset-0 flex items-center justify-center text-sm text-red-300 p-4 text-center">無法開啟相機：{err}</div>}
+      {err && <div className="absolute inset-0 flex items-center justify-center text-sm text-white p-4 text-center">無法開啟相機：{err}</div>}
       {/* heading strip */}
       <div className="absolute top-3 inset-x-3 h-16 rounded-xl bg-black/50 backdrop-blur-sm overflow-hidden">
-        <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-gold" />
+        <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-brand" />
         {ticks.map((t) => (
           <div key={t.d} className="absolute top-0 bottom-0 flex flex-col items-center" style={{ left: `calc(50% + ${t.d * 2.6}px)`, transform: 'translateX(-50%)' }}>
-            <div className={`w-px ${t.major ? 'h-4 bg-paper' : 'h-2 bg-paper/50'}`} />
-            {t.label && <div className="text-[13px] font-serif text-paper mt-0.5">{t.label}</div>}
-            {t.cardinal && <div className="text-[10px] text-gold">{t.cardinal}</div>}
+            <div className={`w-px ${t.major ? 'h-4 bg-white' : 'h-2 bg-white/50'}`} />
+            {t.label && <div className="text-[13px] text-white mt-0.5">{t.label}</div>}
+            {t.cardinal && <div className="text-[10px] text-brand">{t.cardinal}</div>}
           </div>
         ))}
       </div>
       <div className="absolute bottom-3 inset-x-3 flex items-end justify-between">
         <div className="rounded-xl bg-black/60 px-3 py-2">
-          <div className="text-3xl font-bold text-paper tabular-nums">{heading == null ? '--' : heading.toFixed(0)}°</div>
-          {heading != null && <div className="text-xs text-gold">向 {mountainOf(heading).name}山 · {PALACES[mountainOf(heading).palace].direction}</div>}
+          <div className="font-mono text-3xl text-white tabular-nums">{heading == null ? '--' : heading.toFixed(0)}°</div>
+          {heading != null && <div className="text-xs text-white/80">向 {mountainOf(heading).name}山 · {PALACES[mountainOf(heading).palace].direction}</div>}
         </div>
-        <button onClick={onClose} className="rounded-xl bg-black/60 px-3 py-2 text-sm text-paper">關閉</button>
+        <button onClick={onClose} className="rounded-xl bg-black/60 px-3 py-2 text-sm text-white">關閉</button>
       </div>
       {/* center reticle */}
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 border-2 border-gold/70 rounded-full" />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 border-2 border-white/70 rounded-full" />
     </div>
   )
 }

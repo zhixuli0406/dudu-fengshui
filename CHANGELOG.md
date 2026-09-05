@@ -5,6 +5,8 @@
 ## [Unreleased]
 
 ### Added
+- 隱私與免責聲明頁（資料只存本機、感測器與相機用途、Variant Launch 第三方、GitHub Pages 託管、文化參考免責）與首次使用同意閘；「刪除全部資料」按鈕。
+- 空間掃描改為完整流程：外牆（閉合）→ 逐一房間（選類型後點角）→ 門窗（大門／房門／窗點在牆上）→ 自動生成平面圖（含房間與門窗物件、以大門定朝向與北方）；即時小地圖、每段牆長、面積；Chrome 平面偵測顯示牆面並可「用偵測到的地板」；點 UI 不再誤放點（`beforexrselect`）。
 - 替卦（起星）：兼向超過門檻（3.5°／4.5°／6° 可選）時自動改用傳統蔣大鴻／沈氏替星表排盤，並標示「替而不替」；可設定一律下卦僅提示。
 - 七星打劫（離宮真打劫／坎宮假打劫）盤面條件判定，標示為進階格局。
 - 多樓層平面圖：樓層切換、複製外牆新增樓層、層序；樓上樓下規則（廁所在臥室／廚房／神明廳上方、馬桶在床上方、床在灶上方、樓梯壓床灶神位、臥室懸空於騎樓／挑空）。
@@ -14,6 +16,7 @@
 - iOS AR：整合 Variant Launch（App Clip 檢視器）。`VITE_VARIANT_LAUNCH_KEY` 設定後，iOS Safari 掃描頁可交棒 Launch 檢視器取得 WebXR hit-test／anchors／DOM overlay，沿用同一套點地板建圖流程；GitHub Pages 工作流由 Secrets 注入 key。AR session 改為只硬性要求 `hit-test`；DOM overlay 改為 React 樹外節點＋portal、AR 期間頁面背景透明、ARKit 追蹤品質提示。
 
 ### Changed
+- 全站重新設計：沿用 MDS 設計系統（OKLCH 語義 token、四層 surface、lucide 圖示、400/500 字重），淺色為主並跟隨系統深色；首頁改為四步驟清單與「下一步」；平面圖頁改為底部工具列＋情境面板，顯示設定與樓層操作收進面板；報告頁改為總評數字＋分頁；移除 emoji 圖示與深色金框卡片。
 - 部署目標由 Cloud Run 改為 GitHub Pages；Dockerfile 保留作為自架選項。
 - 羅盤方位改以 W3C 旋轉矩陣計算：平放取機頂方向（＋螢幕旋轉角，`screen.orientation.angle` 為逆時針、公式 heading + angle 依規範推導並測試），直立（相機模式）取鏡頭方向；不再用只在平放時正確的 360 − alpha。
 

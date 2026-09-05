@@ -33,7 +33,7 @@ const ITEM_COLOR: Record<ItemType, string> = {
 }
 const ITEM_ICON: Partial<Record<ItemType, string>> = { mainDoor: '門', door: '门', window: '窗', bed: '床', stove: '灶', sink: '槽', fridge: '冰', toilet: '廁', desk: '桌', sofa: '沙', mirror: '鏡', beam: '樑', altar: '神', stairs: '梯', elevator: '電', aquarium: '魚', column: '柱', tv: '視', plant: '植', lamp: '燈' }
 const ROOM_FILL: Record<RoomType, string> = {
-  living: 'rgba(214,179,92,0.10)', bedroom: 'rgba(124,92,191,0.16)', master: 'rgba(124,92,191,0.22)', kids: 'rgba(124,92,191,0.12)', study: 'rgba(63,143,74,0.16)', kitchen: 'rgba(217,72,59,0.16)', dining: 'rgba(214,179,92,0.14)', bathroom: 'rgba(47,111,176,0.20)', entry: 'rgba(214,179,92,0.06)', balcony: 'rgba(63,143,74,0.08)', altar: 'rgba(192,57,43,0.12)', storage: 'rgba(107,114,128,0.16)', corridor: 'rgba(107,114,128,0.08)', driveway: 'rgba(40,40,40,0.35)', void: 'rgba(0,0,0,0.45)', other: 'rgba(107,114,128,0.10)',
+  living: 'color-mix(in oklch, var(--el-earth) 14%, transparent)', bedroom: 'color-mix(in oklch, var(--el-water) 14%, transparent)', master: 'color-mix(in oklch, var(--el-water) 20%, transparent)', kids: 'color-mix(in oklch, var(--el-water) 10%, transparent)', study: 'color-mix(in oklch, var(--el-wood) 14%, transparent)', kitchen: 'color-mix(in oklch, var(--el-fire) 14%, transparent)', dining: 'color-mix(in oklch, var(--el-earth) 18%, transparent)', bathroom: 'color-mix(in oklch, var(--el-metal) 30%, transparent)', entry: 'color-mix(in oklch, var(--el-earth) 8%, transparent)', balcony: 'color-mix(in oklch, var(--el-wood) 8%, transparent)', altar: 'color-mix(in oklch, var(--el-fire) 10%, transparent)', storage: 'color-mix(in oklch, var(--muted-foreground) 16%, transparent)', corridor: 'color-mix(in oklch, var(--muted-foreground) 8%, transparent)', driveway: 'color-mix(in oklch, var(--foreground) 25%, transparent)', void: 'color-mix(in oklch, var(--foreground) 40%, transparent)', other: 'color-mix(in oklch, var(--muted-foreground) 10%, transparent)',
 }
 
 export function PlanEditor(props: EditorProps) {
@@ -164,32 +164,32 @@ export function PlanEditor(props: EditorProps) {
   }, [view, grid])
 
   return (
-    <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="w-full h-full touch-none select-none bg-[#141210]" preserveAspectRatio="xMidYMid meet"
+    <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="w-full h-full touch-none select-none bg-page-canvas" preserveAspectRatio="xMidYMid meet"
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
       {/* underlay */}
       {plan.underlay && (() => { const u = plan.underlay; const w = u.pxW * u.cmPerPx, h = u.pxH * u.cmPerPx; return (
         <image href={u.dataUrl} x={u.x} y={u.y} width={w} height={h} opacity={u.opacity} preserveAspectRatio="none" transform={`rotate(${u.rotation} ${u.x + w / 2} ${u.y + h / 2})`} pointerEvents="none" />
       ) })()}
       {/* grid */}
-      <g stroke="#2a2622" strokeWidth={view.w / 1400}>
+      <g stroke="var(--surface-border)" strokeWidth={view.w / 1400}>
         {gridLines.xs.map((x) => <line key={`x${x}`} x1={x} y1={view.y} x2={x} y2={view.y + view.h} strokeOpacity={x % (grid * 2) === 0 ? 1 : 0.5} />)}
         {gridLines.ys.map((y) => <line key={`y${y}`} x1={view.x} y1={y} x2={view.x + view.w} y2={y} strokeOpacity={y % (grid * 2) === 0 ? 1 : 0.5} />)}
       </g>
       {/* rooms */}
       {plan.rooms.map((r) => r.polygon.length >= 3 && (
         <g key={r.id}>
-          <polygon points={r.polygon.map((p) => `${p.x},${p.y}`).join(' ')} fill={ROOM_FILL[r.type]} stroke={selectedId === r.id ? '#f5f0e6' : '#8a7f70'} strokeWidth={selectedId === r.id ? fontSize / 5 : fontSize / 9} />
-          <text x={polygonCentroid(r.polygon).x} y={polygonCentroid(r.polygon).y - fontSize * 1.6} textAnchor="middle" fontSize={fontSize * 0.85} fill="#f5f0e6" opacity={0.8}>{r.name || ROOM_ZH[r.type]}</text>
+          <polygon points={r.polygon.map((p) => `${p.x},${p.y}`).join(' ')} fill={ROOM_FILL[r.type]} stroke={selectedId === r.id ? 'var(--brand)' : 'var(--muted-foreground)'} strokeWidth={selectedId === r.id ? fontSize / 5 : fontSize / 9} />
+          <text x={polygonCentroid(r.polygon).x} y={polygonCentroid(r.polygon).y - fontSize * 1.6} textAnchor="middle" fontSize={fontSize * 0.85} fill="var(--foreground)" opacity={0.8}>{r.name || ROOM_ZH[r.type]}</text>
         </g>
       ))}
       {/* outline */}
       {plan.outline.length >= 2 && (
-        <polygon points={plan.outline.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#f5f0e6" strokeWidth={fontSize / 4} strokeLinejoin="round" />
+        <polygon points={plan.outline.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke="var(--foreground)" strokeWidth={fontSize / 4} strokeLinejoin="round" />
       )}
-      {mode === 'outline' && plan.outline.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.6} fill={i === 0 ? '#d6b35c' : '#f5f0e6'} stroke="#1c1917" strokeWidth={2} />)}
-      {mode === 'select' && plan.outline.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.35} fill="#8a7f70" />)}
+      {mode === 'outline' && plan.outline.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.6} fill={i === 0 ? 'var(--brand)' : 'var(--surface)'} stroke="var(--foreground)" strokeWidth={2} />)}
+      {mode === 'select' && plan.outline.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.35} fill="var(--muted-foreground)" />)}
       {/* room drag preview */}
-      {drag?.kind === 'room' && <rect x={Math.min(drag.start.x, drag.cur.x)} y={Math.min(drag.start.y, drag.cur.y)} width={Math.abs(drag.cur.x - drag.start.x)} height={Math.abs(drag.cur.y - drag.start.y)} fill={ROOM_FILL[roomType]} stroke="#d6b35c" strokeDasharray="8 6" strokeWidth={fontSize / 8} />}
+      {drag?.kind === 'room' && <rect x={Math.min(drag.start.x, drag.cur.x)} y={Math.min(drag.start.y, drag.cur.y)} width={Math.abs(drag.cur.x - drag.start.x)} height={Math.abs(drag.cur.y - drag.start.y)} fill={ROOM_FILL[roomType]} stroke="var(--brand)" strokeDasharray="8 6" strokeWidth={fontSize / 8} />}
       {/* overlay */}
       {overlay !== 'none' && plan.outline.length >= 3 && <NineGridOverlay center={center} radius={radius} northOffset={plan.northOffset} style={overlay} bounds={bounds} info={overlayInfo} fontSize={fontSize} />}
       {/* items */}
@@ -199,22 +199,22 @@ export function PlanEditor(props: EditorProps) {
         const hl = highlightIds?.includes(i.id)
         return (
           <g key={i.id} transform={`rotate(${i.facing} ${cx} ${cy})`}>
-            <rect x={i.x} y={i.y} width={i.w} height={i.h} rx={fontSize / 6} fill={ITEM_COLOR[i.type]} fillOpacity={i.type === 'beam' ? 0.35 : 0.75} stroke={sel ? '#f5f0e6' : hl ? '#c0392b' : '#1c1917'} strokeWidth={sel || hl ? fontSize / 5 : fontSize / 12} />
+            <rect x={i.x} y={i.y} width={i.w} height={i.h} rx={fontSize / 6} fill={ITEM_COLOR[i.type]} fillOpacity={i.type === 'beam' ? 0.35 : 0.75} stroke={sel ? 'var(--brand)' : hl ? 'var(--destructive)' : 'var(--surface)'} strokeWidth={sel || hl ? fontSize / 5 : fontSize / 12} />
             {/* facing arrow */}
-            <polygon points={`${cx},${i.y - fontSize * 0.9} ${cx - fontSize * 0.4},${i.y - fontSize * 0.2} ${cx + fontSize * 0.4},${i.y - fontSize * 0.2}`} fill={sel ? '#f5f0e6' : '#d6b35c'} />
-            <text x={cx} y={cy + fontSize * 0.35} textAnchor="middle" fontSize={Math.min(fontSize, Math.max(i.w, i.h) / 2)} fill="#f5f0e6" fontFamily="var(--font-serif)" transform={`rotate(${-i.facing} ${cx} ${cy})`}>{ITEM_ICON[i.type] ?? ITEM_ZH[i.type][0]}</text>
+            <polygon points={`${cx},${i.y - fontSize * 0.9} ${cx - fontSize * 0.4},${i.y - fontSize * 0.2} ${cx + fontSize * 0.4},${i.y - fontSize * 0.2}`} fill={sel ? 'var(--brand)' : 'var(--foreground)'} />
+            <text x={cx} y={cy + fontSize * 0.35} textAnchor="middle" fontSize={Math.min(fontSize, Math.max(i.w, i.h) / 2)} fill="white" transform={`rotate(${-i.facing} ${cx} ${cy})`}>{ITEM_ICON[i.type] ?? ITEM_ZH[i.type][0]}</text>
           </g>
         )
       })}
       {/* finding marks */}
-      {marks?.map((m, k) => m.length >= 2 ? <line key={k} x1={m[0]!.x} y1={m[0]!.y} x2={m[1]!.x} y2={m[1]!.y} stroke="#c0392b" strokeWidth={fontSize / 5} strokeDasharray="10 6" pointerEvents="none" /> : m.length === 1 ? <circle key={k} cx={m[0]!.x} cy={m[0]!.y} r={fontSize} fill="none" stroke="#c0392b" strokeWidth={fontSize / 5} pointerEvents="none" /> : null)}
+      {marks?.map((m, k) => m.length >= 2 ? <line key={k} x1={m[0]!.x} y1={m[0]!.y} x2={m[1]!.x} y2={m[1]!.y} stroke="var(--destructive)" strokeWidth={fontSize / 5} strokeDasharray="10 6" pointerEvents="none" /> : m.length === 1 ? <circle key={k} cx={m[0]!.x} cy={m[0]!.y} r={fontSize} fill="none" stroke="var(--destructive)" strokeWidth={fontSize / 5} pointerEvents="none" /> : null)}
       {/* calibrate points */}
-      {mode === 'calibrate' && calibratePoints?.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.6} fill="#2e8b6a" stroke="#f5f0e6" strokeWidth={2} pointerEvents="none" />)}
-      {mode === 'calibrate' && calibratePoints && calibratePoints.length === 2 && <line x1={calibratePoints[0]!.x} y1={calibratePoints[0]!.y} x2={calibratePoints[1]!.x} y2={calibratePoints[1]!.y} stroke="#2e8b6a" strokeWidth={fontSize / 5} strokeDasharray="8 6" pointerEvents="none" />}
+      {mode === 'calibrate' && calibratePoints?.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.6} fill="var(--brand)" stroke="var(--surface)" strokeWidth={2} pointerEvents="none" />)}
+      {mode === 'calibrate' && calibratePoints && calibratePoints.length === 2 && <line x1={calibratePoints[0]!.x} y1={calibratePoints[0]!.y} x2={calibratePoints[1]!.x} y2={calibratePoints[1]!.y} stroke="var(--brand)" strokeWidth={fontSize / 5} strokeDasharray="8 6" pointerEvents="none" />}
       {/* scale bar */}
       <g transform={`translate(${view.x + view.w * 0.04} ${view.y + view.h * 0.96})`}>
-        <line x1={0} y1={0} x2={100} y2={0} stroke="#f5f0e6" strokeWidth={fontSize / 6} />
-        <text x={50} y={-fontSize * 0.4} textAnchor="middle" fontSize={fontSize * 0.7} fill="#f5f0e6">1 m</text>
+        <line x1={0} y1={0} x2={100} y2={0} stroke="var(--foreground)" strokeWidth={fontSize / 6} />
+        <text x={50} y={-fontSize * 0.4} textAnchor="middle" fontSize={fontSize * 0.7} fill="var(--foreground)">1 m</text>
       </g>
     </svg>
   )
