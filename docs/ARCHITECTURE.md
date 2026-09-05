@@ -75,7 +75,7 @@ src/store/         zustand + localStorage 持久化
 
 ## 分享圖
 
-`src/share/shareCard.ts` 以字串組出 1080×1350 的 SVG（標頭、平面圖＋所選分析層的八方扇形、註記、分數、免責），`svgToPng` 用 `<img>`＋canvas 轉 PNG（2×），`shareOrDownload` 優先 Web Share（files），否則下載。只用系統字型，SVG 作為圖片繪入 canvas 時才能正確顯示中文。
+`src/share/shareCard.ts` 以字串組出 SVG：`buildShareSvg` 為 1080×1350 單層分享卡，`buildReportSvg` 為高度依內容伸縮的完整報告長圖（共用 `drawPlan`），`svgToPng` 用 `<img>`＋canvas 轉 PNG（2×，總像素上限 1,600 萬以符合 iOS canvas 限制），`shareOrDownload` 優先 Web Share（files），否則下載。只用系統字型，SVG 作為圖片繪入 canvas 時才能正確顯示中文。
 
 ## 形勢規則引擎
 

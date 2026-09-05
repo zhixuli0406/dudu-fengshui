@@ -171,7 +171,3 @@ html.ar-active #root > * { visibility: hidden; }
 #ar-overlay-root { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
 #ar-overlay-root > * { pointer-events: auto; }
 
-@media print {
-  nav, .no-print { display: none !important; }
-  body { background: white; }
-}

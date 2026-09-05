@@ -53,7 +53,6 @@ export function PlanPage() {
   const findings = useMemo(() => (showFindings ? runFormRules(plan) : []), [plan, showFindings])
   const crossCount = useMemo(() => (floors.length > 1 ? runAllFormRules(floors).filter((f) => f.floor?.includes('／')).length : 0), [floors])
   const report = useMemo(() => {
-    if (overlayKind === 'palace' && sheet !== 'share') return null
     try { return buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode }) } catch { return null }
   }, [overlayKind, sheet, persons, house, plan])
   const overlayInfo = useMemo<Partial<Record<Trigram, PalaceOverlayInfo>> | undefined>(() => {
@@ -67,6 +66,9 @@ export function PlanPage() {
         if (primary) { const star = primary.stars[p.palace]; out[p.palace] = { lines: [{ shengqi: '生氣', tianyi: '天醫', yannian: '延年', fuwei: '伏位', huohai: '禍害', liusha: '六煞', wugui: '五鬼', jueming: '絕命' }[star]], tone: ['shengqi', 'tianyi', 'yannian', 'fuwei'].includes(star) ? 'good' : 'bad' } }
       }
     }
+    for (const t of report.bazhai.wealth) out[t] = { lines: [...(out[t]?.lines ?? []), '財位'], tone: out[t]?.tone ?? 'neutral' }
+    for (const t of report.bazhai.wenchang) if ((t as string) !== 'center') out[t] = { lines: [...(out[t]?.lines ?? []), '文昌'], tone: out[t]?.tone ?? 'neutral' }
+    for (const t of report.bazhai.wealthLeak) out[t] = { lines: [...(out[t]?.lines ?? []), '洩財'], tone: out[t]?.tone ?? 'neutral' }
     return out
   }, [report, overlayKind])
 

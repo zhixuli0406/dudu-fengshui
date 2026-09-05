@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Download, Printer, Share2 } from 'lucide-react'
+import { Download, Share2 } from 'lucide-react'
 import { ShareSheet } from '../components/ShareSheet'
+import { buildReportSvg, shareOrDownload, svgToPng } from '../share/shareCard'
 import { Page, PageHeader } from '../components/AppShell'
 import { Badge, Button, Empty, Segmented } from '../components/mds'
 import { useAppStore } from '../store/useAppStore'
@@ -24,6 +25,8 @@ export function ReportPage() {
   const { persons, house, plan, floors, environment } = useAppStore()
   const [tab, setTab] = useState<Tab>('summary')
   const [share, setShare] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [dlMsg, setDlMsg] = useState<string | null>(null)
   const report = useMemo<Report | null>(() => {
     try {
       const mainPlan = mainFloor(floors.length ? floors : [plan])
@@ -46,17 +49,27 @@ export function ReportPage() {
   if (plan.outline.length < 3) missing.push({ text: '尚未繪製平面圖，形勢與方位分析受限', to: '/plan' })
   if (Object.keys(environment).length === 0) missing.push({ text: '尚未填寫屋外環境', to: '/environment' })
 
-  const download = () => {
+  const downloadMarkdown = () => {
     const blob = new Blob([reportToMarkdown(report)], { type: 'text/markdown;charset=utf-8' })
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `fengshui-report-${report.year}.md`; a.click(); URL.revokeObjectURL(a.href)
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `fengshui-report-${report.year}.md`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+  }
+  const downloadImage = async () => {
+    setDownloading(true); setDlMsg(null)
+    try {
+      const { svg, height } = buildReportSvg({ kind: 'annual', plan: mainFloor(floors.length ? floors : [plan]), report })
+      const blob = await svgToPng(svg, 1080, height)
+      const how = await shareOrDownload(blob, `fengshui-report-${report.year}.png`, '嘟嘟風水分析報告')
+      setDlMsg(how === 'shared' ? '已開啟分享' : '已下載報告圖')
+    } catch (e) { setDlMsg((e as Error).message) } finally { setDownloading(false) }
   }
   const tone = (s: number) => (s >= 75 ? 'text-brand' : s >= 50 ? 'text-foreground' : 'text-destructive')
 
   return (
     <>
-      <PageHeader title="分析報告" subtitle={`${report.year} ${report.ganzhi}年，${report.period} 運`} right={<div className="flex gap-1"><Button variant="brandSubtle" size="sm" onClick={() => setShare(true)}><Share2 />分享圖</Button><Button variant="ghost" size="icon-sm" aria-label="列印" onClick={() => window.print()}><Printer /></Button><Button variant="ghost" size="icon-sm" aria-label="匯出 Markdown" onClick={download}><Download /></Button></div>} />
+      <PageHeader title="分析報告" subtitle={`${report.year} ${report.ganzhi}年，${report.period} 運`} right={<div className="flex gap-1"><Button variant="brandSubtle" size="sm" onClick={() => setShare(true)}><Share2 />分享圖</Button><Button variant="ghost" size="icon-sm" aria-label="下載報告圖" onClick={downloadImage} disabled={downloading}><Download /></Button></div>} />
       {share && <ShareSheet plan={mainFloor(floors.length ? floors : [plan])} report={report} onClose={() => setShare(false)} />}
       <Page className="space-y-5">
+        {dlMsg && <p className="text-xs text-muted-foreground">{dlMsg}</p>}
         {missing.length > 0 && (
           <ul className="space-y-1 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
             {missing.map((m) => <li key={m.to} className="flex items-center justify-between gap-2">{m.text}<Link to={m.to} className="shrink-0 text-brand underline underline-offset-2">去補</Link></li>)}
@@ -219,7 +232,7 @@ export function ReportPage() {
             ))}
           </ul>
         )}
-        <p className="text-xs text-muted-foreground">本報告為文化參考，各派理論互有出入；重大裝修請諮詢專業人士。<Link to="/privacy" className="underline underline-offset-2">免責聲明</Link></p>
+        <p className="text-xs text-muted-foreground">本報告為文化參考，各派理論互有出入；重大裝修請諮詢專業人士。<Link to="/privacy" className="underline underline-offset-2">免責聲明</Link>。需要文字版可<button className="underline underline-offset-2" onClick={downloadMarkdown}>下載 Markdown</button>。</p>
       </Page>
     </>
   )
