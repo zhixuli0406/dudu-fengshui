@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, RotateCcw, RotateCw, ScanLine, Square, Trash2, Undo2, X } from 'lucide-react'
+import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, RotateCcw, RotateCw, ScanLine, Share2, Square, Trash2, Undo2, X } from 'lucide-react'
 import { PlanEditor, type EditorMode } from '../components/PlanEditor'
 import { Page as _Page, PageHeader } from '../components/AppShell'
 import { Badge, Button, Input, NativeSelect, Segmented } from '../components/mds'
@@ -15,6 +15,7 @@ import type { PalaceOverlayInfo } from '../components/NineGridOverlay'
 import { buildReport } from '../engine/report'
 import { NINE_STARS } from '../engine/stars'
 import { fileToDataUrl } from '../lib/image'
+import { ShareSheet } from '../components/ShareSheet'
 import type { Point } from '../engine/geometry'
 import { cn } from '../lib/utils'
 void _Page
@@ -39,9 +40,11 @@ export function PlanPage() {
   const [overlay, setOverlay] = useState<'none' | 'pie' | 'grid'>(settings.gridStyle)
   const [overlayKind, setOverlayKind] = useState<'palace' | 'bazhai' | 'stars' | 'annual'>('palace')
   const [showFindings, setShowFindings] = useState(true)
-  const [sheet, setSheet] = useState<'none' | 'menu' | 'display'>('none')
+  const [sheet, setSheet] = useState<'none' | 'menu' | 'display' | 'share'>('none')
   const [contextOpen, setContextOpen] = useState(true)
   const [calPts, setCalPts] = useState<Point[]>([])
+  const [roomShape, setRoomShape] = useState<'rect' | 'poly'>('poly')
+  const [roomDraft, setRoomDraft] = useState<Point[]>([])
   const [calDist, setCalDist] = useState(300)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -50,9 +53,9 @@ export function PlanPage() {
   const findings = useMemo(() => (showFindings ? runFormRules(plan) : []), [plan, showFindings])
   const crossCount = useMemo(() => (floors.length > 1 ? runAllFormRules(floors).filter((f) => f.floor?.includes('／')).length : 0), [floors])
   const report = useMemo(() => {
-    if (overlayKind === 'palace') return null
+    if (overlayKind === 'palace' && sheet !== 'share') return null
     try { return buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode }) } catch { return null }
-  }, [overlayKind, persons, house, plan])
+  }, [overlayKind, sheet, persons, house, plan])
   const overlayInfo = useMemo<Partial<Record<Trigram, PalaceOverlayInfo>> | undefined>(() => {
     if (!report) return undefined
     const out: Partial<Record<Trigram, PalaceOverlayInfo>> = {}
@@ -87,7 +90,13 @@ export function PlanPage() {
     updatePlan((p) => ({ ...p, underlay: { ...u, cmPerPx: u.cmPerPx * k, x: u.x * k, y: u.y * k } }))
     setCalPts([]); setMode('outline')
   }
-  const changeMode = (m: EditorMode) => { setMode(m); setContextOpen(true); if (m !== 'select') setSelectedId(null) }
+  const changeMode = (m: EditorMode) => { setMode(m); setContextOpen(true); if (m !== 'select') setSelectedId(null); if (m !== 'room') setRoomDraft([]) }
+  const closeRoomDraft = () => {
+    if (roomDraft.length < 3) return
+    addRoom({ type: roomType, polygon: roomDraft })
+    setRoomDraft([])
+  }
+  const fillWholeFloor = () => { if (plan.outline.length >= 3) addRoom({ type: roomType, polygon: plan.outline.map((q) => ({ ...q })) }) }
 
   return (
     <div className="mx-auto flex h-[calc(100dvh-3.75rem-env(safe-area-inset-bottom))] w-full max-w-2xl flex-col sm:border-x sm:border-surface-border">
@@ -111,6 +120,7 @@ export function PlanPage() {
           onUpdateItem={updateItem}
           overlay={overlay} overlayInfo={overlayInfo}
           calibratePoints={calPts} onCalibratePoint={(p) => setCalPts((c) => (c.length >= 2 ? [p] : [...c, p]))}
+          roomShape={roomShape} roomDraft={roomDraft} onRoomDraftPoint={(p) => setRoomDraft((d) => [...d, p])} onRoomDraftClose={closeRoomDraft}
           marks={findings.filter((f) => f.marks?.length).map((f) => f.marks!)}
           highlightIds={findings.flatMap((f) => f.itemIds)}
         />
@@ -161,12 +171,22 @@ export function PlanPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground">點擊依序放置轉角，拖曳可微調；至少 3 點後按「閉合」。</span>
                 <Button variant="outline" size="sm" onClick={() => updatePlan((p) => ({ ...p, outline: p.outline.slice(0, -1) }))} disabled={!plan.outline.length}><Undo2 />退一步</Button>
-                <Button variant="brand" size="sm" onClick={() => setMode('room')} disabled={plan.outline.length < 3}>閉合（{plan.outline.length} 點）</Button>
+                <Button variant="brand" size="sm" onClick={() => { changeMode('room'); setRoomShape('poly') }} disabled={plan.outline.length < 3}>閉合並定房間（{plan.outline.length} 點）</Button>
               </div>
             )}
             {mode === 'room' && (
-              <div className="space-y-1.5">
-                <div className="text-xs text-muted-foreground">選房間類型後，在圖上拖曳畫出範圍。</div>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Segmented value={roomShape} onValueChange={(v) => { setRoomShape(v); setRoomDraft([]) }} options={[{ value: 'poly', label: '逐點畫' }, { value: 'rect', label: '拖曳矩形' }]} />
+                  {roomShape === 'poly' ? (
+                    <>
+                      <span className="text-xs text-muted-foreground">點每個牆角，會自動吸附外牆與既有房間；點回第一點或按「閉合」完成。</span>
+                      <Button variant="outline" size="sm" onClick={() => setRoomDraft((d) => d.slice(0, -1))} disabled={!roomDraft.length}><Undo2 />退一步</Button>
+                      <Button variant="brand" size="sm" onClick={closeRoomDraft} disabled={roomDraft.length < 3}>閉合房間（{roomDraft.length}）</Button>
+                    </>
+                  ) : <span className="text-xs text-muted-foreground">在圖上拖曳畫出矩形範圍。</span>}
+                  {plan.rooms.length === 0 && plan.outline.length >= 3 && <Button variant="ghost" size="sm" onClick={fillWholeFloor}>整層當一個房間</Button>}
+                </div>
                 <div className="flex gap-1.5 overflow-x-auto pb-1">{ROOM_TYPES.map((t) => <Chip key={t} active={roomType === t} onClick={() => setRoomType(t)}>{ROOM_ZH[t]}</Chip>)}</div>
               </div>
             )}
@@ -216,7 +236,8 @@ export function PlanPage() {
         </div>
       </div>
 
-      {sheet !== 'none' && (
+      {sheet === 'share' && report && <ShareSheet plan={plan} report={report} onClose={() => setSheet('none')} initialKind={overlayKind === 'palace' ? 'annual' : overlayKind} />}
+      {(sheet === 'menu' || sheet === 'display') && (
         <div className="fixed inset-0 z-50" role="dialog">
           <button aria-label="關閉" className="absolute inset-0 bg-black/20" onClick={() => setSheet('none')} />
           <div className="sheet-enter absolute inset-x-0 bottom-0 mx-auto max-w-2xl rounded-t-2xl bg-surface-raised p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-[var(--floating-shadow)]">
@@ -247,6 +268,7 @@ export function PlanPage() {
                 <label className="flex flex-col gap-1 text-xs">九宮疊圖<Segmented value={overlay} onValueChange={(v) => { setOverlay(v); if (v !== 'none') setSettings({ gridStyle: v }) }} options={[{ value: 'none', label: '無' }, { value: 'pie', label: '八方扇形' }, { value: 'grid', label: '九宮格' }]} /></label>
                 <label className="flex flex-col gap-1 text-xs">疊圖內容<Segmented value={overlayKind} onValueChange={setOverlayKind} options={[{ value: 'palace', label: '方位' }, { value: 'bazhai', label: '八宅' }, { value: 'stars', label: '飛星' }, { value: 'annual', label: '流年' }]} /></label>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-[var(--brand)]" checked={showFindings} onChange={(e) => setShowFindings(e.target.checked)} />在圖上標示形勢問題</label>
+                <Button variant="brandSubtle" className="w-full" onClick={() => setSheet('share')}><Share2 />分享分析圖（PNG）</Button>
               </div>
             )}
           </div>
@@ -263,7 +285,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 function contextTitle(mode: EditorMode, itemType?: ItemType, roomType?: RoomType): string {
   if (itemType) return `已選取：${ITEM_ZH[itemType]}`
   if (roomType) return `已選取房間：${ROOM_ZH[roomType]}`
-  return { calibrate: '底圖：匯入照片並校正比例', outline: '外牆：點擊放置轉角', room: '房間：拖曳畫出範圍', item: '物件：點擊放置', select: '選取與移動' }[mode]
+  return { calibrate: '底圖：匯入照片並校正比例', outline: '外牆：點擊放置轉角', room: '定房間：逐點畫出每個房間', item: '物件：點擊放置', select: '選取與移動' }[mode]
 }
 
 function facingHint(t: ItemType): string {

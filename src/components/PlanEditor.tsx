@@ -25,6 +25,11 @@ export interface EditorProps {
   /** calibrate mode: two picked points (plan cm) */
   calibratePoints?: Point[]
   onCalibratePoint?: (p: Point) => void
+  /** room drawing: rectangle drag or polygon clicks (snaps to outline / room corners and edges) */
+  roomShape?: 'rect' | 'poly'
+  roomDraft?: Point[]
+  onRoomDraftPoint?: (p: Point) => void
+  onRoomDraftClose?: () => void
 }
 
 const ITEM_COLOR: Record<ItemType, string> = {
@@ -37,7 +42,7 @@ const ROOM_FILL: Record<RoomType, string> = {
 }
 
 export function PlanEditor(props: EditorProps) {
-  const { plan, mode, roomType, itemType, selectedId, onSelect, onAddOutlinePoint, onMoveOutlinePoint, onAddRoom, onAddItem, onUpdateItem, overlay, overlayInfo, marks, highlightIds, calibratePoints, onCalibratePoint } = props
+  const { plan, mode, roomType, itemType, selectedId, onSelect, onAddOutlinePoint, onMoveOutlinePoint, onAddRoom, onAddItem, onUpdateItem, overlay, overlayInfo, marks, highlightIds, calibratePoints, onCalibratePoint, roomShape = 'poly', roomDraft = [], onRoomDraftPoint, onRoomDraftClose } = props
   const svgRef = useRef<SVGSVGElement>(null)
   const [view, setView] = useState({ x: -200, y: -200, w: 1400, h: 1400 })
   const [drag, setDrag] = useState<null | { kind: 'pan'; start: Point; view0: typeof view } | { kind: 'item'; id: string; offset: Point } | { kind: 'vertex'; index: number } | { kind: 'room'; start: Point; cur: Point }>(null)
@@ -45,6 +50,32 @@ export function PlanEditor(props: EditorProps) {
   const pinch = useRef<{ d0: number; view0: typeof view; c0: Point } | null>(null)
   const grid = plan.gridCm || 50
   const snap = useCallback((v: number) => Math.round(v / (grid / 2)) * (grid / 2), [grid])
+  /** Snap to existing corners / edges (outline + rooms) within tolerance, else to the grid. */
+  const snapPoint = useCallback((p: Point, tol: number): Point => {
+    const polys = [plan.outline, ...plan.rooms.map((r) => r.polygon)].filter((q) => q.length >= 2)
+    let best: { d: number; p: Point } | null = null
+    for (const poly of polys) {
+      for (const v of poly) { const d = Math.hypot(v.x - p.x, v.y - p.y); if (d <= tol && (!best || d < best.d)) best = { d, p: v } }
+    }
+    if (best) return { x: best.p.x, y: best.p.y }
+    for (const poly of polys) {
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i]!, b = poly[(i + 1) % poly.length]!
+        if (poly.length < 3 && i === poly.length - 1) break
+        const l2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2 || 1
+        const t = Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2))
+        const q = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) }
+        const d = Math.hypot(q.x - p.x, q.y - p.y)
+        if (d <= tol && (!best || d < best.d)) best = { d, p: q }
+      }
+    }
+    if (best) {
+      // keep the snapped point on the edge but round the free coordinate to the grid
+      const q = best.p
+      return { x: Math.abs(q.x - snap(q.x)) < 1e-6 ? q.x : Math.round(q.x * 10) / 10, y: Math.abs(q.y - snap(q.y)) < 1e-6 ? q.y : Math.round(q.y * 10) / 10 }
+    }
+    return { x: snap(p.x), y: snap(p.y) }
+  }, [plan.outline, plan.rooms, snap])
 
   // fit view to outline on first render / when outline changes
   const outlineKey = plan.outline.map((p) => `${p.x},${p.y}`).join(';') + (plan.underlay ? `|u${plan.underlay.pxW}x${plan.underlay.cmPerPx}` : '')
@@ -100,7 +131,15 @@ export function PlanEditor(props: EditorProps) {
       onAddOutlinePoint({ x: snap(p.x), y: snap(p.y) })
       return
     }
-    if (mode === 'room') { setDrag({ kind: 'room', start: { x: snap(p.x), y: snap(p.y) }, cur: { x: snap(p.x), y: snap(p.y) } }); return }
+    if (mode === 'room') {
+      if (roomShape === 'poly') {
+        const tol = fontSize * 1.2
+        if (roomDraft.length >= 3 && Math.hypot(roomDraft[0]!.x - p.x, roomDraft[0]!.y - p.y) < tol) { onRoomDraftClose?.(); return }
+        onRoomDraftPoint?.(snapPoint(p, tol))
+        return
+      }
+      setDrag({ kind: 'room', start: { x: snap(p.x), y: snap(p.y) }, cur: { x: snap(p.x), y: snap(p.y) } }); return
+    }
     if (mode === 'item') {
       const d = ITEM_DEFAULT[itemType]
       onAddItem({ type: itemType, x: snap(p.x) - d.w / 2, y: snap(p.y) - d.h / 2, w: d.w, h: d.h, facing: 0 })
@@ -190,6 +229,13 @@ export function PlanEditor(props: EditorProps) {
       {mode === 'select' && plan.outline.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.35} fill="var(--muted-foreground)" />)}
       {/* room drag preview */}
       {drag?.kind === 'room' && <rect x={Math.min(drag.start.x, drag.cur.x)} y={Math.min(drag.start.y, drag.cur.y)} width={Math.abs(drag.cur.x - drag.start.x)} height={Math.abs(drag.cur.y - drag.start.y)} fill={ROOM_FILL[roomType]} stroke="var(--brand)" strokeDasharray="8 6" strokeWidth={fontSize / 8} />}
+      {/* polygon room draft */}
+      {mode === 'room' && roomDraft.length > 0 && (
+        <g pointerEvents="none">
+          {roomDraft.length >= 2 && <polyline points={roomDraft.map((p) => `${p.x},${p.y}`).join(' ')} fill={roomDraft.length >= 3 ? ROOM_FILL[roomType] : 'none'} stroke="var(--brand)" strokeWidth={fontSize / 8} strokeDasharray="8 6" />}
+          {roomDraft.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * (i === 0 ? 0.7 : 0.45)} fill={i === 0 ? 'var(--brand)' : 'var(--surface)'} stroke="var(--brand)" strokeWidth={2} />)}
+        </g>
+      )}
       {/* overlay */}
       {overlay !== 'none' && plan.outline.length >= 3 && <NineGridOverlay center={center} radius={radius} northOffset={plan.northOffset} style={overlay} bounds={bounds} info={overlayInfo} fontSize={fontSize} />}
       {/* items */}

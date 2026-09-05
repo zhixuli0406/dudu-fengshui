@@ -73,6 +73,10 @@ src/store/         zustand + localStorage 持久化
 
 `store.floors[]` 為各層 `FloorPlan`（`name`、`level`，0 = 主層），`plan` 永遠等於 `floors[activeFloor]`。各層以同一外牆原點繪製（新增樓層預設複製外牆）。`runAllFormRules(floors)` 對每層跑單層規則（標記樓層），再以 `crossFloorRules` 對相鄰層（level 差 1）做投影重疊判定（房間重疊率 ≥ 30% 以取樣估算；物件以旋轉矩形 AABB 重疊）。方位與飛星分析以 `mainFloor()`（含大門者，否則 level 0）為準。
 
+## 分享圖
+
+`src/share/shareCard.ts` 以字串組出 1080×1350 的 SVG（標頭、平面圖＋所選分析層的八方扇形、註記、分數、免責），`svgToPng` 用 `<img>`＋canvas 轉 PNG（2×），`shareOrDownload` 優先 Web Share（files），否則下載。只用系統字型，SVG 作為圖片繪入 canvas 時才能正確顯示中文。
+
 ## 形勢規則引擎
 
 `buildContext(plan)` 提供中心、方位、房間查找、視線遮擋（線段與所有牆邊相交，端點附近的牆忽略以容許門在牆上）等工具；各規則模組回傳 `Finding[]`，`runFormRules` 去重並依嚴重度排序。分數 = 100 − Σ 權重（高 12、中 6、低 2，各派有別者減半）。

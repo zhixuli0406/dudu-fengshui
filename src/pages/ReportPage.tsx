@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Download, Printer } from 'lucide-react'
+import { Download, Printer, Share2 } from 'lucide-react'
+import { ShareSheet } from '../components/ShareSheet'
 import { Page, PageHeader } from '../components/AppShell'
 import { Badge, Button, Empty, Segmented } from '../components/mds'
 import { useAppStore } from '../store/useAppStore'
@@ -22,6 +23,7 @@ type Tab = 'summary' | 'bazhai' | 'xuankong' | 'annual' | 'form' | 'element'
 export function ReportPage() {
   const { persons, house, plan, floors, environment } = useAppStore()
   const [tab, setTab] = useState<Tab>('summary')
+  const [share, setShare] = useState(false)
   const report = useMemo<Report | null>(() => {
     try {
       const mainPlan = mainFloor(floors.length ? floors : [plan])
@@ -52,7 +54,8 @@ export function ReportPage() {
 
   return (
     <>
-      <PageHeader title="分析報告" subtitle={`${report.year} ${report.ganzhi}年，${report.period} 運`} right={<div className="flex gap-1"><Button variant="ghost" size="icon-sm" aria-label="列印" onClick={() => window.print()}><Printer /></Button><Button variant="ghost" size="icon-sm" aria-label="匯出 Markdown" onClick={download}><Download /></Button></div>} />
+      <PageHeader title="分析報告" subtitle={`${report.year} ${report.ganzhi}年，${report.period} 運`} right={<div className="flex gap-1"><Button variant="brandSubtle" size="sm" onClick={() => setShare(true)}><Share2 />分享圖</Button><Button variant="ghost" size="icon-sm" aria-label="列印" onClick={() => window.print()}><Printer /></Button><Button variant="ghost" size="icon-sm" aria-label="匯出 Markdown" onClick={download}><Download /></Button></div>} />
+      {share && <ShareSheet plan={mainFloor(floors.length ? floors : [plan])} report={report} onClose={() => setShare(false)} />}
       <Page className="space-y-5">
         {missing.length > 0 && (
           <ul className="space-y-1 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
