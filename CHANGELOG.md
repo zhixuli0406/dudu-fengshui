@@ -10,6 +10,8 @@
 - 多樓層平面圖：樓層切換、複製外牆新增樓層、層序；樓上樓下規則（廁所在臥室／廚房／神明廳上方、馬桶在床上方、床在灶上方、樓梯壓床灶神位、臥室懸空於騎樓／挑空）。
 - 高度資訊：樑深（≥ 30 cm 加重）、天花板淨高、吊燈／吊扇壓床座。
 - GitHub Pages 部署（GitHub Actions，`BASE_PATH` 子路徑、SPA 404 fallback、PWA scope）。
+- 平面圖「底圖」模式：匯入建商平面圖或手繪草圖照片（iPhone 相機可直接拍），點兩個已知距離校正比例後描圖；底圖可調透明度、旋轉、移除。這是 iOS 沒有 WebXR 時的通用替代路徑。
+- iOS AR 供應層抽象（`src/ar/providers.ts`）：以環境變數 `VITE_IOS_XR_PROVIDER`／`VITE_IOS_XR_SDK_URL` 掛載 App Clip 型 WebXR polyfill（如 Variant Launch），掛載後沿用同一套 hit-test 掃描流程。
 
 ### Changed
 - 部署目標由 Cloud Run 改為 GitHub Pages；Dockerfile 保留作為自架選項。

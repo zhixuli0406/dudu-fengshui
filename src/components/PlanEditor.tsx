@@ -4,7 +4,7 @@ import { bbox, polygonCentroid, type Point } from '../engine/geometry'
 import { NineGridOverlay, type PalaceOverlayInfo } from './NineGridOverlay'
 import type { Trigram } from '../engine/bagua'
 
-export type EditorMode = 'select' | 'outline' | 'room' | 'item'
+export type EditorMode = 'select' | 'outline' | 'room' | 'item' | 'calibrate'
 
 export interface EditorProps {
   plan: FloorPlan
@@ -22,6 +22,9 @@ export interface EditorProps {
   overlayInfo?: Partial<Record<Trigram, PalaceOverlayInfo>>
   marks?: Point[][]
   highlightIds?: string[]
+  /** calibrate mode: two picked points (plan cm) */
+  calibratePoints?: Point[]
+  onCalibratePoint?: (p: Point) => void
 }
 
 const ITEM_COLOR: Record<ItemType, string> = {
@@ -34,7 +37,7 @@ const ROOM_FILL: Record<RoomType, string> = {
 }
 
 export function PlanEditor(props: EditorProps) {
-  const { plan, mode, roomType, itemType, selectedId, onSelect, onAddOutlinePoint, onMoveOutlinePoint, onAddRoom, onAddItem, onUpdateItem, overlay, overlayInfo, marks, highlightIds } = props
+  const { plan, mode, roomType, itemType, selectedId, onSelect, onAddOutlinePoint, onMoveOutlinePoint, onAddRoom, onAddItem, onUpdateItem, overlay, overlayInfo, marks, highlightIds, calibratePoints, onCalibratePoint } = props
   const svgRef = useRef<SVGSVGElement>(null)
   const [view, setView] = useState({ x: -200, y: -200, w: 1400, h: 1400 })
   const [drag, setDrag] = useState<null | { kind: 'pan'; start: Point; view0: typeof view } | { kind: 'item'; id: string; offset: Point } | { kind: 'vertex'; index: number } | { kind: 'room'; start: Point; cur: Point }>(null)
@@ -44,10 +47,12 @@ export function PlanEditor(props: EditorProps) {
   const snap = useCallback((v: number) => Math.round(v / (grid / 2)) * (grid / 2), [grid])
 
   // fit view to outline on first render / when outline changes
-  const outlineKey = plan.outline.map((p) => `${p.x},${p.y}`).join(';')
+  const outlineKey = plan.outline.map((p) => `${p.x},${p.y}`).join(';') + (plan.underlay ? `|u${plan.underlay.pxW}x${plan.underlay.cmPerPx}` : '')
   useEffect(() => {
-    if (plan.outline.length < 3) return
-    const b = bbox(plan.outline)
+    const u = plan.underlay
+    const pts = plan.outline.length >= 3 ? plan.outline : u ? [{ x: u.x, y: u.y }, { x: u.x + u.pxW * u.cmPerPx, y: u.y + u.pxH * u.cmPerPx }] : []
+    if (pts.length < 2) return
+    const b = bbox(pts)
     const w = b.maxX - b.minX, h = b.maxY - b.minY
     const m = Math.max(w, h) * 0.35 + 150
     setView({ x: b.minX - m, y: b.minY - m, w: w + 2 * m, h: h + 2 * m })
@@ -87,6 +92,7 @@ export function PlanEditor(props: EditorProps) {
       setDrag(null)
       return
     }
+    if (mode === 'calibrate') { onCalibratePoint?.(p); return }
     if (mode === 'outline') {
       // dragging existing vertex?
       const vi = plan.outline.findIndex((v) => Math.hypot(v.x - p.x, v.y - p.y) < fontSize)
@@ -160,6 +166,10 @@ export function PlanEditor(props: EditorProps) {
   return (
     <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="w-full h-full touch-none select-none bg-[#141210]" preserveAspectRatio="xMidYMid meet"
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onWheel={onWheel}>
+      {/* underlay */}
+      {plan.underlay && (() => { const u = plan.underlay; const w = u.pxW * u.cmPerPx, h = u.pxH * u.cmPerPx; return (
+        <image href={u.dataUrl} x={u.x} y={u.y} width={w} height={h} opacity={u.opacity} preserveAspectRatio="none" transform={`rotate(${u.rotation} ${u.x + w / 2} ${u.y + h / 2})`} pointerEvents="none" />
+      ) })()}
       {/* grid */}
       <g stroke="#2a2622" strokeWidth={view.w / 1400}>
         {gridLines.xs.map((x) => <line key={`x${x}`} x1={x} y1={view.y} x2={x} y2={view.y + view.h} strokeOpacity={x % (grid * 2) === 0 ? 1 : 0.5} />)}
@@ -198,6 +208,9 @@ export function PlanEditor(props: EditorProps) {
       })}
       {/* finding marks */}
       {marks?.map((m, k) => m.length >= 2 ? <line key={k} x1={m[0]!.x} y1={m[0]!.y} x2={m[1]!.x} y2={m[1]!.y} stroke="#c0392b" strokeWidth={fontSize / 5} strokeDasharray="10 6" pointerEvents="none" /> : m.length === 1 ? <circle key={k} cx={m[0]!.x} cy={m[0]!.y} r={fontSize} fill="none" stroke="#c0392b" strokeWidth={fontSize / 5} pointerEvents="none" /> : null)}
+      {/* calibrate points */}
+      {mode === 'calibrate' && calibratePoints?.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={fontSize * 0.6} fill="#2e8b6a" stroke="#f5f0e6" strokeWidth={2} pointerEvents="none" />)}
+      {mode === 'calibrate' && calibratePoints && calibratePoints.length === 2 && <line x1={calibratePoints[0]!.x} y1={calibratePoints[0]!.y} x2={calibratePoints[1]!.x} y2={calibratePoints[1]!.y} stroke="#2e8b6a" strokeWidth={fontSize / 5} strokeDasharray="8 6" pointerEvents="none" />}
       {/* scale bar */}
       <g transform={`translate(${view.x + view.w * 0.04} ${view.y + view.h * 0.96})`}>
         <line x1={0} y1={0} x2={100} y2={0} stroke="#f5f0e6" strokeWidth={fontSize / 6} />

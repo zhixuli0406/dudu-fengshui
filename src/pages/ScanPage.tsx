@@ -7,9 +7,12 @@ const loadAR = () => import('../ar/arSession')
 import { useAppStore } from '../store/useAppStore'
 import { useCompass } from '../hooks/useCompass'
 import { polygonArea } from '../engine/geometry'
+import { detectAR, loadIOSProvider, type ARCapability } from '../ar/providers'
 
 export function ScanPage() {
   const [supported, setSupported] = useState<boolean | null>(null)
+  const [cap, setCap] = useState<ARCapability | null>(null)
+  const [loadingProvider, setLoadingProvider] = useState(false)
   const [running, setRunning] = useState(false)
   const [status, setStatus] = useState('')
   const [pts, setPts] = useState<ARPoint[]>([])
@@ -22,9 +25,18 @@ export function ScanPage() {
   const { setPlan, plan, setHouse } = useAppStore()
   const nav = useNavigate()
 
-  useEffect(() => { loadAR().then((m) => m.isARSupported()).then(setSupported) }, [])
+  useEffect(() => { detectAR().then((c) => { setCap(c); setSupported(c.nativeXR) }) }, [])
   useEffect(() => () => { handle.current?.end() }, [])
 
+  const startIOSProvider = async () => {
+    setErr(null); setLoadingProvider(true)
+    try {
+      const ok = await loadIOSProvider()
+      if (!ok) { setErr('iOS AR 供應層載入後仍無法取得 WebXR（可能需要先透過 App Clip 開啟）'); return }
+      setSupported(true)
+      await start()
+    } catch (e) { setErr((e as Error).message) } finally { setLoadingProvider(false) }
+  }
   const start = async () => {
     setErr(null)
     try {
@@ -78,18 +90,25 @@ export function ScanPage() {
           {features && <Badge tone={features.planeDetection ? 'green' : 'gray'}>平面偵測 {features.planeDetection ? '✓' : '✗'}</Badge>}
           {features && <Badge tone={features.depth ? 'green' : 'gray'}>深度 {features.depth ? '✓' : '✗'}</Badge>}
         </div>
-        {supported === false && (
+        {supported === false && cap?.ios && cap.providerConfigured && (
+          <div className="mt-3 rounded-xl bg-jade/10 border border-jade/40 p-3 text-xs text-paper/80 leading-relaxed">
+            iOS Safari 原生不支援 WebXR，本站已設定 iOS AR 供應層（{cap.providerName}）：按下方按鈕會透過 App Clip 開啟 AR，之後即可像 Android 一樣點地板轉角建圖。
+            <div className="mt-2"><Button onClick={startIOSProvider} disabled={loadingProvider}>{loadingProvider ? '載入中…' : '在 iPhone 啟動 AR（App Clip）'}</Button></div>
+          </div>
+        )}
+        {supported === false && !(cap?.ios && cap.providerConfigured) && (
           <div className="mt-3 rounded-xl bg-ink p-3 text-xs text-paper/70 leading-relaxed">
-            此瀏覽器不支援 WebXR immersive-ar（iOS Safari／iPadOS 目前皆不支援）。替代做法：<br />
-            1. iPhone 用內建「測距儀」App 量出各邊長度，再到「平面圖」頁依格線繪製（格線預設 50cm）。<br />
-            2. 用「羅盤」頁的 AR 鏡頭模式（相機＋羅盤疊圖）量測坐向。<br />
-            3. Android 手機請用 Chrome 開啟本頁。
+            此瀏覽器不支援 WebXR immersive-ar（iOS Safari／iPadOS 原生皆不支援）。替代做法：<br />
+            1. <b>照片描圖</b>：到「平面圖」頁按「底圖」，拍建商平面圖或手繪草圖，點兩個已知距離校正比例，再照著描外牆與房間（iPhone 可用）。<br />
+            2. iPhone 用內建「測距儀」App 量出各邊長度，再依格線繪製（格線預設 50cm）。<br />
+            3. 用「羅盤」頁的 AR 鏡頭模式（相機＋羅盤疊圖）量測坐向。<br />
+            4. Android 手機請用 Chrome 開啟本頁。
           </div>
         )}
         {compass.status === 'need-permission' && <Button variant="ghost" className="mt-3" onClick={compass.requestPermission}>先啟用羅盤（定北用）</Button>}
         <div className="mt-3 flex gap-2">
           <Button onClick={start} disabled={!supported || running}>開始掃描</Button>
-          <Button variant="subtle" onClick={() => nav('/plan')}>直接手繪平面圖</Button>
+          <Button variant="subtle" onClick={() => nav('/plan')}>手繪／照片描圖</Button>
         </div>
         {err && <div className="text-xs text-red-300 mt-2">{err}</div>}
       </Card>

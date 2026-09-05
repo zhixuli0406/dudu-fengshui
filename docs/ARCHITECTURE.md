@@ -23,7 +23,8 @@ src/engine/        純 TypeScript，無 DOM 依賴，vitest 覆蓋
 src/data/          demoPlan、environmentQuestions.json、formRulesCatalog.json（204 條）、lubanRuler.json — 由 `node scripts/sync-research-data.mjs` 從 docs/research/*.json 同步產生
 scripts/           sync-research-data.mjs、verify_flying_star.py（調研時的獨立排盤驗證器，Python）
 src/hooks/         useCompass（感測器）、useDeclination（GPS + WMM）
-src/ar/            WebXR hit-test 掃描、相機羅盤疊圖
+src/ar/            WebXR hit-test 掃描、相機羅盤疊圖、providers.ts（AR 能力偵測與 iOS 供應層載入）
+src/lib/           image.ts（照片縮圖）
 src/components/    CompassDial、PlanEditor、NineGridOverlay、ui
 src/pages/         Home / Setup / Compass / Plan / Scan / Report / Knowledge
 src/store/         zustand + localStorage 持久化
@@ -49,6 +50,12 @@ src/store/         zustand + localStorage 持久化
 ## 各派有別的處理
 
 依 docs/research 的分歧清單，不硬編單一答案：取向依據、灶位判法為使用者設定；連珠三般卦、死煞分界、兼向門檻、鬼門線廁所等在文案標示「各派有別」；化解物品一律「原則（五行洩化）在前、坊間物品在後」。
+
+## AR 分層
+
+- Tier 1：原生 WebXR `immersive-ar` + hit-test（Chrome Android、Samsung Internet、Quest、visionOS Safari）。Chrome 147+ 另用 `plane-detection` 顯示地板並可 `initiateRoomCapture()`。
+- Tier 2：iOS 供應層。`detectAR()` 判斷 iOS 且 `VITE_IOS_XR_SDK_URL` 已設定時，掃描頁提供「在 iPhone 啟動 AR」按鈕，`loadIOSProvider()` 注入 SDK 後等待 `navigator.xr` 出現，之後與 Tier 1 共用 `startARSession`。
+- Tier 3：`FloorPlan.underlay` 照片底圖（縮圖 ≤ 1600px JPEG 存 localStorage）＋兩點比例校正；以及相機羅盤疊圖。全平台可用。
 
 ## 多樓層
 

@@ -69,6 +69,24 @@ export interface FloorPlan {
   northOffset: number
   /** scale hint for the editor: cm per grid cell */
   gridCm: number
+  /** 照片／建商平面圖底圖（描圖用），座標為 cm */
+  underlay?: Underlay
+}
+
+export interface Underlay {
+  /** downscaled JPEG data URL */
+  dataUrl: string
+  /** natural pixel size of the stored image */
+  pxW: number
+  pxH: number
+  /** placement in plan cm */
+  x: number
+  y: number
+  /** cm per image pixel */
+  cmPerPx: number
+  opacity: number
+  /** rotation in degrees about the image centre */
+  rotation: number
 }
 
 export function emptyPlan(name = '1F', level = 0): FloorPlan {

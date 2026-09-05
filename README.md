@@ -12,7 +12,7 @@
 | 玄空飛星 | 三元九運、運／山／向盤（下卦與替卦）、旺山旺向等格局、七星打劫、81 組合吉凶、正零神、兼向與空亡提示 |
 | 流年 | 年／月飛星、五黃二黑三碧七赤位置、太歲歲破三煞、犯太歲生肖、對應到你的房間 |
 | 形勢派 | 由平面圖幾何自動判定 50 餘條禁忌（穿堂煞、門沖床、樑壓床、鏡照床、開門見灶、水火相沖、廁所居中、火燒天門、缺角…），多樓層時另判樓上樓下關係（廁所在臥室上方、床在灶上方…），附化解方法；另有 38 題外局問卷與 204 條規則庫可查 |
-| 空間技術 | DeviceOrientation 羅盤（iOS／Android）、WMM2025 磁偏角、相機羅盤疊圖、WebXR AR hit-test 掃描（含平面偵測顯示） |
+| 空間技術 | DeviceOrientation 羅盤（iOS／Android）、WMM2025 磁偏角、相機羅盤疊圖、WebXR AR hit-test 掃描（含平面偵測與房間掃描）、照片底圖描圖（兩點比例校正）、iOS App Clip 型 WebXR 供應層（可選） |
 | 輸出 | 分數儀表、優先處理清單、九宮疊圖、Markdown 匯出、列印 |
 
 ## 安裝
@@ -35,6 +35,8 @@ npm run preview  # 預覽 dist
 ```
 
 手機測試感測器時，Safari／Chrome 要求安全來源：用 `localhost` 或部署到 HTTPS。最快的方式是 `npx vite --host` 後用 ngrok／Cloudflare Tunnel 建 HTTPS 轉發。
+
+iOS 上的 AR：Safari 原生不支援 WebXR。預設走「底圖描圖」（拍平面圖照片校正比例後描圖）與「相機羅盤疊圖」；若要真正的 AR 點地板建圖，複製 `.env.example` 為 `.env` 填入 App Clip 型供應層的 SDK 網址（見 `docs/research/05-ios-webar-alternatives.md`），掃描頁會出現「在 iPhone 啟動 AR」按鈕。
 
 ### 操作流程
 

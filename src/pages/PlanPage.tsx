@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { fileToDataUrl } from '../lib/image'
+import type { Point } from '../engine/geometry'
 import { PlanEditor, type EditorMode } from '../components/PlanEditor'
 import { Button, inputCls } from '../components/ui'
 import { ITEM_ZH, ROOM_ZH, type ItemType, type RoomType } from '../engine/floorplan'
@@ -24,6 +26,27 @@ export function PlanPage() {
   const [overlay, setOverlay] = useState<'none' | 'pie' | 'grid'>('pie')
   const [overlayKind, setOverlayKind] = useState<'palace' | 'bazhai' | 'stars' | 'annual'>('palace')
   const [showFindings, setShowFindings] = useState(true)
+  const [calPts, setCalPts] = useState<Point[]>([])
+  const [calDist, setCalDist] = useState(300)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const loadUnderlay = async (file: File) => {
+    const { dataUrl, w, h } = await fileToDataUrl(file)
+    // initial scale: fit long edge to ~1000 cm
+    const cmPerPx = 1000 / Math.max(w, h)
+    updatePlan((p) => ({ ...p, underlay: { dataUrl, pxW: w, pxH: h, x: 0, y: 0, cmPerPx, opacity: 0.55, rotation: 0 } }))
+    setMode('calibrate'); setCalPts([])
+  }
+  const applyCalibration = () => {
+    const u = plan.underlay
+    if (!u || calPts.length !== 2 || calDist <= 0) return
+    const dPlan = Math.hypot(calPts[1]!.x - calPts[0]!.x, calPts[1]!.y - calPts[0]!.y)
+    if (dPlan < 1) return
+    const k = calDist / dPlan
+    // scale image about the plan origin so picked points keep their pixel identity
+    updatePlan((p) => ({ ...p, underlay: { ...u, cmPerPx: u.cmPerPx * k, x: u.x * k, y: u.y * k } }))
+    setCalPts([]); setMode('outline')
+  }
 
   const selectedItem = plan.items.find((i) => i.id === selectedId)
   const selectedRoom = plan.rooms.find((r) => r.id === selectedId)
@@ -88,7 +111,7 @@ export function PlanPage() {
       </div>
       {/* mode bar */}
       <div className="px-3 py-2 flex gap-1 overflow-x-auto text-xs">
-        {([['outline', '外牆'], ['room', '房間'], ['item', '物件'], ['select', '選取／移動']] as [EditorMode, string][]).map(([m, l]) => (
+        {([['calibrate', '底圖'], ['outline', '外牆'], ['room', '房間'], ['item', '物件'], ['select', '選取／移動']] as [EditorMode, string][]).map(([m, l]) => (
           <button key={m} onClick={() => setMode(m)} className={`shrink-0 px-3 py-1.5 rounded-lg ${mode === m ? 'bg-gold text-ink font-semibold' : 'bg-ink-2 text-paper/80'}`}>{l}</button>
         ))}
         <span className="mx-1 border-l border-ink-3" />
@@ -106,6 +129,19 @@ export function PlanPage() {
           <span className="text-paper/60 shrink-0">點擊依序放置外牆轉角（順時針），完成後按「閉合」</span>
           <Button variant="subtle" className="!py-1 !px-2 shrink-0" onClick={undoOutline} disabled={!plan.outline.length}>退一步</Button>
           <Button className="!py-1 !px-2 shrink-0" onClick={closeOutline} disabled={plan.outline.length < 3}>閉合（{plan.outline.length} 點）</Button>
+        </>)}
+        {mode === 'calibrate' && (<>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void loadUnderlay(f); e.target.value = '' }} />
+          <Button variant="subtle" className="!py-1 !px-2 shrink-0" onClick={() => fileRef.current?.click()}>{plan.underlay ? '換底圖' : '匯入照片／平面圖'}</Button>
+          {plan.underlay && (<>
+            <span className="text-paper/60 shrink-0">點兩個已知距離的點 → 輸入實際長度</span>
+            <input type="number" className="w-16 rounded bg-ink px-1 py-0.5 shrink-0" value={calDist} onChange={(e) => setCalDist(Number(e.target.value) || 0)} /><span className="shrink-0">cm</span>
+            <Button className="!py-1 !px-2 shrink-0" onClick={applyCalibration} disabled={calPts.length !== 2}>套用比例（{calPts.length}/2）</Button>
+            <label className="flex items-center gap-1 shrink-0">透明度<input type="range" min={0.1} max={1} step={0.05} value={plan.underlay.opacity} onChange={(e) => updatePlan((p) => ({ ...p, underlay: p.underlay && { ...p.underlay, opacity: Number(e.target.value) } }))} /></label>
+            <Button variant="subtle" className="!py-1 !px-2 shrink-0" onClick={() => updatePlan((p) => ({ ...p, underlay: p.underlay && { ...p.underlay, rotation: (p.underlay.rotation + 90) % 360 } }))}>↻90°</Button>
+            <Button variant="danger" className="!py-1 !px-2 shrink-0" onClick={() => { updatePlan((p) => ({ ...p, underlay: undefined })); setCalPts([]) }}>移除底圖</Button>
+          </>)}
+          {!plan.underlay && <span className="text-paper/60 shrink-0">iPhone 可直接拍建商平面圖或手繪草圖，校正比例後照著描外牆與房間。</span>}
         </>)}
         {mode === 'room' && (<>
           <span className="text-paper/60 shrink-0">拖曳畫出房間：</span>
@@ -149,6 +185,7 @@ export function PlanPage() {
           onAddItem={(it) => { const id = addItem({ ...it, roomId: autoRoomId(it.x, it.y, it.w, it.h) }); setSelectedId(id); setMode('select') }}
           onUpdateItem={updateItem}
           overlay={overlay} overlayInfo={overlayInfo}
+          calibratePoints={calPts} onCalibratePoint={(p) => setCalPts((c) => (c.length >= 2 ? [p] : [...c, p]))}
           marks={findings.filter((f) => f.marks?.length).map((f) => f.marks!)}
           highlightIds={findings.flatMap((f) => f.itemIds)}
         />
