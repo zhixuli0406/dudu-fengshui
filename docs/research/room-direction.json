@@ -1,0 +1,317 @@
+{
+ "bagua_directions": [
+  {
+   "dir": "正北",
+   "range_deg": [
+    337.5,
+    22.5
+   ],
+   "trigram": "坎",
+   "wuxing": "水",
+   "family": "次子（中男）",
+   "alias": null
+  },
+  {
+   "dir": "東北",
+   "range_deg": [
+    22.5,
+    67.5
+   ],
+   "trigram": "艮",
+   "wuxing": "土",
+   "family": "小兒子（少男）",
+   "alias": "鬼門／鬼戶"
+  },
+  {
+   "dir": "正東",
+   "range_deg": [
+    67.5,
+    112.5
+   ],
+   "trigram": "震",
+   "wuxing": "木",
+   "family": "長子",
+   "alias": null
+  },
+  {
+   "dir": "東南",
+   "range_deg": [
+    112.5,
+    157.5
+   ],
+   "trigram": "巽",
+   "wuxing": "木",
+   "family": "長女",
+   "alias": "地戶"
+  },
+  {
+   "dir": "正南",
+   "range_deg": [
+    157.5,
+    202.5
+   ],
+   "trigram": "離",
+   "wuxing": "火",
+   "family": "次女（中女）",
+   "alias": null
+  },
+  {
+   "dir": "西南",
+   "range_deg": [
+    202.5,
+    247.5
+   ],
+   "trigram": "坤",
+   "wuxing": "土",
+   "family": "母親／女主人",
+   "alias": "人門（裡鬼門）"
+  },
+  {
+   "dir": "正西",
+   "range_deg": [
+    247.5,
+    292.5
+   ],
+   "trigram": "兌",
+   "wuxing": "金",
+   "family": "小女兒（少女）",
+   "alias": null
+  },
+  {
+   "dir": "西北",
+   "range_deg": [
+    292.5,
+    337.5
+   ],
+   "trigram": "乾",
+   "wuxing": "金",
+   "family": "父親／男主人",
+   "alias": "天門"
+  }
+ ],
+ "room_direction_rules": [
+  {
+   "room": "廚房",
+   "direction": "西北",
+   "verdict": "大忌",
+   "reason": "火燒天門，乾為老父，主老父有災、心腦血管疾病、肺病",
+   "source": "https://blog.sina.com.cn/s/blog_96e3e9c30102uyfa.html"
+  },
+  {
+   "room": "廚房",
+   "direction": "東南",
+   "verdict": "宜",
+   "reason": "來源明言『廚房建在東南可以，建在西北就不行』",
+   "source": "https://blog.sina.com.cn/s/blog_96e3e9c30102uyfa.html"
+  },
+  {
+   "room": "廚房",
+   "direction": "中宮",
+   "verdict": "大忌",
+   "reason": "火燒中堂／火燒心房",
+   "source": "https://today.line.me/tw/v2/article/XkP6ZZ"
+  },
+  {
+   "room": "廁所",
+   "direction": "中宮",
+   "verdict": "大忌",
+   "reason": "陽宅第二凶，最忌廁居中",
+   "source": "https://www.ailan.idv.tw/in/in6/in4.html"
+  },
+  {
+   "room": "廁所",
+   "direction": "東北",
+   "verdict": "忌",
+   "reason": "鬼門（艮／鬼戶）",
+   "source": "https://www.ailan.idv.tw/in/in8/in24.html"
+  },
+  {
+   "room": "廁所",
+   "direction": "西南",
+   "verdict": "忌",
+   "reason": "鬼門（坤／人門、裡鬼門）",
+   "source": "https://www.ailan.idv.tw/in/in8/in24.html"
+  },
+  {
+   "room": "兒童房",
+   "direction": "東",
+   "verdict": "宜",
+   "reason": "清晨受陽光；五行屬木利成長",
+   "source": "https://www.100.com.tw/article/3449"
+  },
+  {
+   "room": "兒童房",
+   "direction": "東南",
+   "verdict": "宜",
+   "reason": "同上",
+   "source": "https://www.100.com.tw/article/3449"
+  },
+  {
+   "room": "兒童房",
+   "direction": "西北",
+   "verdict": "忌",
+   "reason": "西北代表權威厚重，孩子易早熟，不利學習成長",
+   "source": "https://www.100.com.tw/article/3449"
+  },
+  {
+   "room": "樓梯",
+   "direction": "中宮",
+   "verdict": "忌",
+   "reason": "心臟血液循環、脊椎病變、家人不和睦",
+   "source": "https://hhh.com.tw/HHH_NEW/columns_detail/6125.php"
+  },
+  {
+   "room": "天井",
+   "direction": "中宮",
+   "verdict": "忌",
+   "reason": "Ailan 綜論 in23",
+   "source": "https://www.ailan.idv.tw/in/in8/in23.html"
+  }
+ ],
+ "wenchang_by_sitting": [
+  {
+   "sitting": "坐北朝南",
+   "trigram_house": "坎宅",
+   "wenchang": "東北",
+   "source": "https://www.ailan.idv.tw/us/ns.html"
+  },
+  {
+   "sitting": "坐南朝北",
+   "trigram_house": "離宅",
+   "wenchang": "正南",
+   "source": "https://www.ailan.idv.tw/us/sn.html"
+  },
+  {
+   "sitting": "坐東朝西",
+   "trigram_house": "震宅",
+   "wenchang": "西北",
+   "source": "https://www.ailan.idv.tw/us/ew.html"
+  },
+  {
+   "sitting": "坐西朝東",
+   "trigram_house": "兌宅",
+   "wenchang": "西南",
+   "source": "https://www.ailan.idv.tw/us/we.html"
+  },
+  {
+   "sitting": "坐西南朝東北",
+   "trigram_house": "坤宅",
+   "wenchang": "正西",
+   "source": "https://www.ailan.idv.tw/us/wsen.html"
+  },
+  {
+   "sitting": "坐東北朝西南",
+   "trigram_house": "艮宅",
+   "wenchang": "正北",
+   "source": "https://www.ailan.idv.tw/us/enws.html"
+  },
+  {
+   "sitting": "坐東南朝西北",
+   "trigram_house": "巽宅",
+   "wenchang": "東南＋中宮",
+   "source": "https://www.ailan.idv.tw/us/eswn.html"
+  },
+  {
+   "sitting": "坐西北朝東南",
+   "trigram_house": "乾宅",
+   "wenchang": "正東",
+   "source": "https://www.ailan.idv.tw/us/wnes.html"
+  }
+ ],
+ "wealth_by_sitting": [
+  {
+   "sitting": "坐北朝南",
+   "wealth": [
+    "正北",
+    "西南"
+   ],
+   "leak": [
+    "正西",
+    "東北"
+   ],
+   "placement": "正北屬水→魚缸配銅龍；西南屬土→陶瓷聚寶盆"
+  },
+  {
+   "sitting": "坐南朝北",
+   "wealth": [
+    "正南",
+    "東北"
+   ],
+   "leak": [
+    "正西",
+    "東南"
+   ],
+   "placement": "正南屬火→水晶球；東北屬土→陶瓷聚寶盆"
+  },
+  {
+   "sitting": "坐東朝西",
+   "wealth": [
+    "正東",
+    "西北"
+   ],
+   "leak": [
+    "西南"
+   ],
+   "placement": "正東屬木→魚缸配銅龍或綠色盆栽；西北屬金→金屬招財神獸"
+  },
+  {
+   "sitting": "坐西朝東",
+   "wealth": [
+    "正南",
+    "西北"
+   ],
+   "leak": [
+    "東北"
+   ],
+   "placement": "正南屬火→玻璃球／水晶球；西北屬金→金屬招財神獸"
+  },
+  {
+   "sitting": "坐西南朝東北",
+   "wealth": [
+    "正東",
+    "西南"
+   ],
+   "leak": [
+    "正南",
+    "正北"
+   ],
+   "placement": "正東屬木→魚缸或綠色盆栽；西南屬土→陶瓷聚寶盆"
+  },
+  {
+   "sitting": "坐東北朝西南",
+   "wealth": [
+    "東北",
+    "西北"
+   ],
+   "leak": [
+    "正東",
+    "東南"
+   ],
+   "placement": "東北屬土→陶瓷聚寶盆；西北屬金→金屬招財神獸"
+  },
+  {
+   "sitting": "坐東南朝西北",
+   "wealth": [
+    "東南",
+    "西南"
+   ],
+   "leak": [
+    "正北"
+   ],
+   "placement": "東南屬木→魚缸配銅龍或闊葉盆栽；西南屬土→陶瓷聚寶盆；西北一定要設水缸"
+  },
+  {
+   "sitting": "坐西北朝東南",
+   "wealth": [
+    "西北",
+    "正西",
+    "正北"
+   ],
+   "leak": [
+    "正南"
+   ],
+   "placement": "正北屬水→魚缸配銅龍；西北／正西屬金→金屬招財神獸；東南一定要設水缸"
+  }
+ ],
+ "source_note": "文昌位與財位表來源：https://www.ailan.idv.tw/us2.html 與 https://www.ailan.idv.tw/money.html （八個坐向各有獨立頁面，已逐一查證）"
+}

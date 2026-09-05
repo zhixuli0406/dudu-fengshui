@@ -1,0 +1,345 @@
+{
+ "wen_gong_chi": {
+  "cycle_cm": 43.2,
+  "word_cm": 5.4,
+  "sub_cm": 1.35,
+  "words": [
+   {
+    "index": 1,
+    "word": "財",
+    "luck": "吉",
+    "start_cm": 0.0,
+    "end_cm": 5.4,
+    "sub_divisions": [
+     {
+      "sub": "財德",
+      "start_cm": 0.0,
+      "end_cm": 1.35
+     },
+     {
+      "sub": "寶庫",
+      "start_cm": 1.35,
+      "end_cm": 2.7
+     },
+     {
+      "sub": "六合",
+      "start_cm": 2.7,
+      "end_cm": 4.05
+     },
+     {
+      "sub": "迎福",
+      "start_cm": 4.05,
+      "end_cm": 5.4
+     }
+    ]
+   },
+   {
+    "index": 2,
+    "word": "病",
+    "luck": "凶",
+    "start_cm": 5.4,
+    "end_cm": 10.8,
+    "sub_divisions": [
+     {
+      "sub": "退財",
+      "start_cm": 5.4,
+      "end_cm": 6.75
+     },
+     {
+      "sub": "公事",
+      "start_cm": 6.75,
+      "end_cm": 8.1
+     },
+     {
+      "sub": "牢執",
+      "start_cm": 8.1,
+      "end_cm": 9.45
+     },
+     {
+      "sub": "孤寡",
+      "start_cm": 9.45,
+      "end_cm": 10.8
+     }
+    ]
+   },
+   {
+    "index": 3,
+    "word": "離",
+    "luck": "凶",
+    "start_cm": 10.8,
+    "end_cm": 16.2,
+    "sub_divisions": [
+     {
+      "sub": "長庫",
+      "start_cm": 10.8,
+      "end_cm": 12.15
+     },
+     {
+      "sub": "劫財",
+      "start_cm": 12.15,
+      "end_cm": 13.5
+     },
+     {
+      "sub": "官鬼",
+      "start_cm": 13.5,
+      "end_cm": 14.85
+     },
+     {
+      "sub": "失脫",
+      "start_cm": 14.85,
+      "end_cm": 16.2
+     }
+    ]
+   },
+   {
+    "index": 4,
+    "word": "義",
+    "luck": "吉",
+    "start_cm": 16.2,
+    "end_cm": 21.6,
+    "sub_divisions": [
+     {
+      "sub": "添丁",
+      "start_cm": 16.2,
+      "end_cm": 17.55
+     },
+     {
+      "sub": "益利",
+      "start_cm": 17.55,
+      "end_cm": 18.9
+     },
+     {
+      "sub": "貴子",
+      "start_cm": 18.9,
+      "end_cm": 20.25
+     },
+     {
+      "sub": "大吉",
+      "start_cm": 20.25,
+      "end_cm": 21.6
+     }
+    ]
+   },
+   {
+    "index": 5,
+    "word": "官",
+    "luck": "吉",
+    "start_cm": 21.6,
+    "end_cm": 27.0,
+    "sub_divisions": [
+     {
+      "sub": "順科",
+      "start_cm": 21.6,
+      "end_cm": 22.95
+     },
+     {
+      "sub": "橫財",
+      "start_cm": 22.95,
+      "end_cm": 24.3
+     },
+     {
+      "sub": "進益",
+      "start_cm": 24.3,
+      "end_cm": 25.65
+     },
+     {
+      "sub": "富貴",
+      "start_cm": 25.65,
+      "end_cm": 27.0
+     }
+    ]
+   },
+   {
+    "index": 6,
+    "word": "劫",
+    "luck": "凶",
+    "start_cm": 27.0,
+    "end_cm": 32.4,
+    "sub_divisions": [
+     {
+      "sub": "死別",
+      "start_cm": 27.0,
+      "end_cm": 28.35
+     },
+     {
+      "sub": "退口",
+      "start_cm": 28.35,
+      "end_cm": 29.7
+     },
+     {
+      "sub": "離鄉",
+      "start_cm": 29.7,
+      "end_cm": 31.05
+     },
+     {
+      "sub": "財失",
+      "start_cm": 31.05,
+      "end_cm": 32.4
+     }
+    ]
+   },
+   {
+    "index": 7,
+    "word": "害",
+    "luck": "凶",
+    "start_cm": 32.4,
+    "end_cm": 37.8,
+    "sub_divisions": [
+     {
+      "sub": "災至",
+      "start_cm": 32.4,
+      "end_cm": 33.75
+     },
+     {
+      "sub": "死絕",
+      "start_cm": 33.75,
+      "end_cm": 35.1
+     },
+     {
+      "sub": "病臨",
+      "start_cm": 35.1,
+      "end_cm": 36.45
+     },
+     {
+      "sub": "口舌",
+      "start_cm": 36.45,
+      "end_cm": 37.8
+     }
+    ]
+   },
+   {
+    "index": 8,
+    "word": "本",
+    "luck": "吉",
+    "start_cm": 37.8,
+    "end_cm": 43.2,
+    "sub_divisions": [
+     {
+      "sub": "財至",
+      "start_cm": 37.8,
+      "end_cm": 39.15
+     },
+     {
+      "sub": "登科",
+      "start_cm": 39.15,
+      "end_cm": 40.5
+     },
+     {
+      "sub": "進寶",
+      "start_cm": 40.5,
+      "end_cm": 41.85
+     },
+     {
+      "sub": "興旺",
+      "start_cm": 41.85,
+      "end_cm": 43.2
+     }
+    ]
+   }
+  ],
+  "note": "一尺四寸四分，以營造尺 1 尺 = 30cm 換算為 43.2cm；8 字每字 5.4cm，每字 4 細分每格 1.35cm。四吉字：財義官本。實務要訣：財頭本尾、抓內不抓外（門框以內側淨尺寸為準）。",
+  "cycle_variants_cm": [
+   42,
+   42.85,
+   42.9,
+   43,
+   43.2,
+   43.63
+  ],
+  "sources": [
+   "https://blog.iegoffice.com/feng-shui-28/",
+   "https://www.817.tw/article.php?id=54",
+   "https://blog.gtwang.org/metaphysics/wen-gong-ruler/",
+   "https://vocus.cc/article/6370b24dfd8978000116171b",
+   "https://homechen.com/2022/02/17/"
+  ]
+ },
+ "ding_lan_chi": {
+  "cycle_cm": 38.78,
+  "word_cm": 3.878,
+  "words": [
+   {
+    "index": 1,
+    "word": "財",
+    "luck": "吉",
+    "start_cm": 0.0,
+    "end_cm": 3.878
+   },
+   {
+    "index": 2,
+    "word": "失",
+    "luck": "凶",
+    "start_cm": 3.878,
+    "end_cm": 7.756
+   },
+   {
+    "index": 3,
+    "word": "興",
+    "luck": "吉",
+    "start_cm": 7.756,
+    "end_cm": 11.634
+   },
+   {
+    "index": 4,
+    "word": "死",
+    "luck": "凶",
+    "start_cm": 11.634,
+    "end_cm": 15.512
+   },
+   {
+    "index": 5,
+    "word": "官",
+    "luck": "吉",
+    "start_cm": 15.512,
+    "end_cm": 19.39
+   },
+   {
+    "index": 6,
+    "word": "義",
+    "luck": "吉",
+    "start_cm": 19.39,
+    "end_cm": 23.268
+   },
+   {
+    "index": 7,
+    "word": "苦",
+    "luck": "凶",
+    "start_cm": 23.268,
+    "end_cm": 27.146
+   },
+   {
+    "index": 8,
+    "word": "旺",
+    "luck": "吉",
+    "start_cm": 27.146,
+    "end_cm": 31.024
+   },
+   {
+    "index": 9,
+    "word": "害",
+    "luck": "凶",
+    "start_cm": 31.024,
+    "end_cm": 34.902
+   },
+   {
+    "index": 10,
+    "word": "丁",
+    "luck": "吉",
+    "start_cm": 34.902,
+    "end_cm": 38.78
+   }
+  ],
+  "note": "陰宅用。長一尺二寸八分，約 38.78cm，分 10 格每格約 3.878cm。六吉字：丁旺義官興財。陽宅程式一般不需要。",
+  "cycle_variants_cm": [
+   38.78,
+   38.8,
+   39
+  ],
+  "sources": [
+   "https://nicecasio.pixnet.net/blog/posts/9460413986",
+   "https://www.newton.com.tw/wiki/丁蘭尺",
+   "https://homechen.com/2022/02/17/"
+  ]
+ },
+ "lookup_algorithm": "x = length_cm % cycle_cm; word_index = floor(x / (cycle/8)); sub_index = floor((x % (cycle/8)) / (cycle/32))"
+}
