@@ -85,19 +85,24 @@ describe('定理交叉驗證（doc 02 §2.12）', () => {
 })
 
 describe('七星打劫', () => {
-  it('掃描九運 24 山：判定結果只出現在雙星到向且離／坎宮當運雙星的盤', () => {
-    for (const m of MOUNTAINS) {
-      const c = flyingStarChartFromMountains(m, oppositeMountain(m), 9)
-      if (!c.qixing) continue
-      const head = c.qixing.kind.startsWith('離') ? 'li' : 'kan'
-      expect(c.mountainStars[head]).toBe(9)
-      expect(c.waterStars[head]).toBe(9)
-    }
+  it('九運 巽山乾向（星林學苑稱離宮打劫 369）→ 判定離宮打劫、369', () => {
+    const c = flyingStarChartFromMountains(mountainByName('巽'), mountainByName('乾'), 9)
+    expect(c.pattern).toBe('double-facing')
+    expect(c.qixing?.kind).toBe('離宮打劫（真打劫）')
+    expect(c.qixing?.group).toBe('369')
   })
-  it('九運 午山子向（雙九到向於坎）→ 坎宮打劫候選需三般卦成立才判定', () => {
-    const c = flyingStarChartFromMountains(mountainByName('午'), mountainByName('子'), 9)
-    expect(c.waterStars.kan).toBe(9)
-    // 坎 [9,9]、巽 [?]、兌 [?] 是否同屬 369 由引擎判斷；此處只驗證不會誤報離宮
-    if (c.qixing) expect(c.qixing.kind).toMatch(/坎宮/)
+  it('雙星到坐不判打劫（九運 子山午向）', () => {
+    const c = flyingStarChartFromMountains(mountainByName('子'), mountainByName('午'), 9)
+    expect(c.pattern).toBe('double-sitting')
+    expect(c.qixing).toBeUndefined()
+  })
+  it('掃描 216 張盤：凡判定打劫者必為雙星到向且向首在該組三宮內', () => {
+    for (let p = 1; p <= 9; p++) for (const m of MOUNTAINS) {
+      const c = flyingStarChartFromMountains(m, oppositeMountain(m), p)
+      if (!c.qixing) continue
+      expect(c.pattern).toBe('double-facing')
+      const group = c.qixing.kind.startsWith('離') ? ['li', 'zhen', 'qian'] : ['kan', 'xun', 'dui']
+      expect(group).toContain(c.facingPalace)
+    }
   })
 })

@@ -125,7 +125,8 @@ export const useAppStore = create<AppState>()(
       name: 'dudu-fengshui-v1',
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>
-        const floors = p.floors && p.floors.length ? p.floors : [p.plan ?? current.plan]
+        const raw = p.floors && p.floors.length ? p.floors : [p.plan ?? current.plan]
+        const floors = raw.map((f, i) => ({ ...f, name: f.name ?? (i === 0 ? '1F' : `${i + 1}F`), level: f.level ?? i }))
         const activeFloor = Math.min(p.activeFloor ?? 0, floors.length - 1)
         return { ...current, ...p, floors, activeFloor, plan: floors[activeFloor]!, house: { ...current.house, ...p.house }, settings: { ...current.settings, ...p.settings } }
       },

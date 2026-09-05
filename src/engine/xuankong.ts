@@ -219,23 +219,25 @@ export function flyingStarChartFromMountains(sitting: Mountain, facing: Mountain
 const SANBAN = [[1, 4, 7], [2, 5, 8], [3, 6, 9]] as const
 
 /**
- * 七星打劫（沈氏／中州派）：當運雙星會於離宮（真打劫）或坎宮（假打劫，中州派不承認），
- * 且該宮與同組兩宮（離震乾／坎巽兌）之山星、向星各屬同一三般卦，且不犯伏吟。
- * 生效仍以巒頭（三宮通氣、外形空缺）為條件，本判定僅為盤面條件。
+ * 七星打劫（沈氏／中州派）：須為雙星到向（當運山向二星會於向首宮），向首宮屬「離震乾」組為離宮打劫（真打劫），
+ * 屬「坎巽兌」組為坎宮打劫（假打劫，中州派不承認），且該組三宮之山星、向星各屬同一三般卦（147／258／369），且不犯伏吟。
+ * 中州派更嚴：向首須恰在離宮，以 `strict` 標示。生效仍以巒頭（三宮通氣、外形空缺）為條件，本判定僅為盤面條件。
  */
 export function detectQixing(periodStars: Chart, mountainStars: Chart, waterStars: Chart, period: number, facingPalace: Trigram, fuyin: boolean): FlyingStarChart['qixing'] | undefined {
   void periodStars
   if (fuyin) return undefined
+  if (mountainStars[facingPalace] !== period || waterStars[facingPalace] !== period) return undefined
   const groups: [Trigram[], '離宮打劫（真打劫）' | '坎宮打劫（假打劫）'][] = [[['li', 'zhen', 'qian'], '離宮打劫（真打劫）'], [['kan', 'xun', 'dui'], '坎宮打劫（假打劫）']]
   for (const [pals, kind] of groups) {
-    const head = pals[0]!
-    if (mountainStars[head] !== period || waterStars[head] !== period) continue
+    if (!pals.includes(facingPalace)) continue
     const inSame = (vals: number[]) => SANBAN.find((g) => vals.every((v) => (g as readonly number[]).includes(v)))
     const gm = inSame(pals.map((p) => mountainStars[p]))
     const gw = inSame(pals.map((p) => waterStars[p]))
-    if (!gm || !gw || gm !== gw) continue
-    const note = kind.startsWith('離') ? '主提前劫取三元旺氣，三宮宜通氣作門路、臥室、廚房，外形宜空缺不可填實；各派判定條件不一。' : '中州派不承認坎宮打劫，僅供參考。'
-    return { kind, group: gm.join(''), note: facingPalace === head ? note : `向首不在${head === 'li' ? '離' : '坎'}宮（較寬鬆判法）。${note}` }
+    if (!gm || !gw || gm !== gw) return undefined
+    const head = pals[0]!
+    const strict = facingPalace === head
+    const base = kind.startsWith('離') ? '主提前劫取三元旺氣，三宮宜通氣作門路、臥室、廚房，外形宜空缺不可填實。' : '中州派不承認坎宮打劫，僅供參考。'
+    return { kind, group: gm.join(''), note: strict ? base : `向首在${PALACES[facingPalace].zh}宮而非${PALACES[head].zh}宮（較寬鬆判法，中州派要求向首在離宮）。${base}` }
   }
   return undefined
 }

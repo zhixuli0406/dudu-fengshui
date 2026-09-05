@@ -5,6 +5,7 @@ const rect = (x: number, y: number, w: number, h: number) => [{ x, y }, { x: x +
 /** 三房兩廳示範平面圖（cm），上方為大門側，朝向以「資料」頁設定。 */
 export function demoPlan(): FloorPlan {
   return {
+    name: '1F', level: 0,
     outline: [{ x: 0, y: 0 }, { x: 1000, y: 0 }, { x: 1000, y: 800 }, { x: 650, y: 800 }, { x: 650, y: 950 }, { x: 0, y: 950 }],
     rooms: [
       { id: 'r_entry', type: 'entry', polygon: rect(350, 0, 200, 150) },
