@@ -215,8 +215,9 @@ export function buildReport(persons: Person[], house: HouseInput, now = new Date
   const annualScore = Math.max(0, 100 - warnings.reduce((a, w) => a + (w.rooms.length ? (w.severity === 'high' ? 18 : w.severity === 'medium' ? 8 : 3) : 0), 0))
 
   // ---- 形勢
-  const findings = runAllFormRules(house.floors && house.floors.length ? house.floors : [house.plan])
-  const fScore = formScore(findings)
+  const synthetic = !!house.plan.synthetic
+  const findings = synthetic ? [] : runAllFormRules(house.floors && house.floors.length ? house.floors : [house.plan])
+  const fScore = synthetic ? 70 : formScore(findings)
 
   // ---- 五行佈置建議
   const elementAdvice = TRIGRAMS_CLOCKWISE.map((t) => {
@@ -238,7 +239,7 @@ export function buildReport(persons: Person[], house: HouseInput, now = new Date
     xuankong: xuankongScore,
     annual: annualScore,
     form: fScore,
-    overall: Math.round(bazhaiScore * 0.25 + xuankongScore * 0.25 + annualScore * 0.15 + fScore * 0.35),
+    overall: synthetic ? Math.round(bazhaiScore * 0.4 + xuankongScore * 0.35 + annualScore * 0.25) : Math.round(bazhaiScore * 0.25 + xuankongScore * 0.25 + annualScore * 0.15 + fScore * 0.35),
   }
 
   const topActions = buildTopActions(findings, items, warnings, palaces)

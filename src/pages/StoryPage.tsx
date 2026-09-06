@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, List, X } from 'lucide-react'
-import { useAppStore } from '../store/useAppStore'
+import { resolveAnalysisPlan, useAppStore } from '../store/useAppStore'
 import { buildReport } from '../engine/report'
-import { mainFloor } from '../engine/floorplan'
 import { NINE_STARS } from '../engine/stars'
 import { buildChapters, type Chapter } from '../story/chapters'
 import type { House3D } from '../story/house3d'
@@ -15,10 +14,11 @@ import type { Trigram } from '../engine/bagua'
 const MASTER = '嘟嘟師傅'
 
 export function StoryPage() {
-  const { persons, house, plan, floors } = useAppStore()
+  const { persons, house, plan, floors, lite } = useAppStore()
   const nav = useNavigate()
-  const activePlan = mainFloor(floors.length ? floors : [plan])
-  const report = useMemo(() => { try { return buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: activePlan, floors: floors.length ? floors : [plan], stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode }) } catch { return null } }, [persons, house, activePlan, floors, plan])
+  const resolved = useMemo(() => resolveAnalysisPlan(floors, plan, house, lite), [floors, plan, house, lite])
+  const activePlan = resolved.plan
+  const report = useMemo(() => { try { return buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: activePlan, floors: resolved.floors, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode }) } catch { return null } }, [persons, house, activePlan, resolved])
   const chapters = useMemo<Chapter[]>(() => (report ? buildChapters(report, activePlan, MASTER) : []), [report, activePlan])
   const [idx, setIdx] = useState(0)
   const [toc, setToc] = useState(false)
@@ -26,7 +26,7 @@ export function StoryPage() {
   const [textKey, setTextKey] = useState(0)
   const mountRef = useRef<HTMLDivElement>(null)
   const houseRef = useRef<House3D | null>(null)
-  const hasPlan = activePlan.outline.length >= 3
+  const hasPlan = activePlan.outline.length >= 3 && (!resolved.synthetic || lite.rooms.length > 0)
   const [coverOk, setCoverOk] = useState(true)
   const coverSrc = `${import.meta.env.BASE_URL}cover.jpg`
 
@@ -74,7 +74,7 @@ export function StoryPage() {
       <div ref={mountRef} className="absolute inset-0" />
       {!hasPlan && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-zinc-300">
-          <div>還沒有平面圖，師傅沒辦法看房。<div className="mt-3"><Link to="/plan/wizard"><Button variant="brand">用精靈建一張</Button></Link></div></div>
+          <div>還沒有房間資料，師傅沒辦法看房。<div className="mt-3 flex justify-center gap-2"><Link to="/start"><Button variant="brand">跟師傅從大門開始</Button></Link><Link to="/plan/wizard"><Button variant="outline">畫平面圖</Button></Link></div></div>
         </div>
       )}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/70 to-transparent" />
@@ -95,7 +95,7 @@ export function StoryPage() {
         <div className="relative z-10 flex flex-1 flex-col items-center justify-end p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] text-center">
           {!coverOk && <MasterAvatar size={128} className="mb-4 shadow-[0_20px_60px_rgba(0,0,0,0.6)]" />}
           <h1 className="text-3xl font-semibold tracking-tight">{MASTER}看房</h1>
-          <p className="mt-2 max-w-xs text-sm text-zinc-300">帶你從門口走一圈，每一間房說一段。看完會有一份照難易度排好的清單。</p>
+          <p className="mt-2 max-w-xs text-sm text-zinc-300">帶你從門口走一圈，每一間房說一段。看完會有一份照難易度排好的清單。{resolved.synthetic && '目前是方位示意屋，畫了平面圖會更準。'}</p>
           <Button variant="brand" size="lg" className="mt-6 w-full max-w-xs" onClick={() => { setStarted(true); setIdx(0) }}>開始看房</Button>
           <p className="mt-3 text-xs text-zinc-500">{chapters.length} 章，約三分鐘</p>
         </div>

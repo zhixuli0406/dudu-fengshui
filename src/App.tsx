@@ -11,6 +11,7 @@ import { ScanPage } from './pages/ScanPage'
 import { ReportPage } from './pages/ReportPage'
 import { EnvironmentPage } from './pages/EnvironmentPage'
 import { PrivacyPage } from './pages/PrivacyPage'
+import { StartPage } from './pages/StartPage'
 
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((m) => ({ default: m.KnowledgePage })))
 const StoryPage = lazy(() => import('./pages/StoryPage').then((m) => ({ default: m.StoryPage })))
@@ -20,6 +21,7 @@ export default function App() {
     <AppShell>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/start" element={<StartPage />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/compass" element={<CompassPage />} />
         <Route path="/plan" element={<PlanPage />} />

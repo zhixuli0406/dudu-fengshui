@@ -6,14 +6,14 @@ import { ShareSheet } from '../components/ShareSheet'
 import { buildReportSvg, shareOrDownload, svgToPng } from '../share/shareCard'
 import { Page, PageHeader } from '../components/AppShell'
 import { Badge, Button, Empty, Segmented } from '../components/mds'
-import { useAppStore } from '../store/useAppStore'
+import { resolveAnalysisPlan, useAppStore } from '../store/useAppStore'
 import { buildReport, type Report } from '../engine/report'
 import { PALACES, TRIGRAMS_CLOCKWISE, type Trigram } from '../engine/bagua'
 import { groupZh, WANDERING_STARS } from '../engine/bazhai'
 import { NINE_STARS, RATING_ZH } from '../engine/stars'
 import { TIMELINESS_ZH } from '../engine/xuankong'
 import { palaceLabel } from '../engine/annual'
-import { ROOM_ZH, mainFloor } from '../engine/floorplan'
+import { ROOM_ZH } from '../engine/floorplan'
 import { SEVERITY_ZH } from '../engine/rules'
 import { reportToMarkdown } from '../engine/exportMarkdown'
 import { environmentFindings, type EnvironmentQuestion } from '../engine/environment'
@@ -25,7 +25,8 @@ import { cn } from '../lib/utils'
 type Tab = 'summary' | 'bazhai' | 'xuankong' | 'annual' | 'form' | 'element'
 
 export function ReportPage() {
-  const { persons, house, plan, floors, environment } = useAppStore()
+  const { persons, house, plan, floors, environment, lite } = useAppStore()
+  const resolved = useMemo(() => resolveAnalysisPlan(floors, plan, house, lite), [floors, plan, house, lite])
   const [view, setView] = useState<'simple' | 'advanced'>('simple')
   const [tab, setTab] = useState<Tab>('summary')
   const [share, setShare] = useState(false)
@@ -33,8 +34,7 @@ export function ReportPage() {
   const [dlMsg, setDlMsg] = useState<string | null>(null)
   const report = useMemo<Report | null>(() => {
     try {
-      const mainPlan = mainFloor(floors.length ? floors : [plan])
-      const r = buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: mainPlan, floors: floors.length ? floors : [plan], stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode })
+      const r = buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: resolved.plan, floors: resolved.floors, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode })
       const env = environmentFindings(environment as Record<string, string | boolean | undefined>, envQuestions as EnvironmentQuestion[])
       if (!env.length) return r
       const order = { high: 0, medium: 1, low: 2 }
@@ -44,14 +44,14 @@ export function ReportPage() {
       const overall = Math.round(r.scores.bazhai * 0.25 + r.scores.xuankong * 0.25 + r.scores.annual * 0.15 + form * 0.35)
       return { ...r, form: { findings, score: form }, scores: { ...r.scores, form, overall } }
     } catch (e) { console.error(e); return null }
-  }, [persons, house, plan, floors, environment])
+  }, [persons, house, resolved, environment])
 
   const actions = useMemo(() => (report ? buildActions(report) : []), [report])
   if (!report) return <Page><Empty tone="destructive" title="無法產生報告" description="請確認資料頁的設定。" /></Page>
   const missing: { text: string; to: string }[] = []
   if (persons.length === 0) missing.push({ text: '尚未新增家庭成員，八宅命卦會是空的', to: '/setup' })
   if (house.facingSource === 'none') missing.push({ text: `尚未量測朝向，目前用預設 ${house.facingBearing}°`, to: '/compass' })
-  if (plan.outline.length < 3) missing.push({ text: '尚未繪製平面圖，形勢與方位分析受限', to: '/plan' })
+  if (resolved.synthetic) missing.push({ text: lite.rooms.length ? '目前用方位示意圖分析；畫出平面圖可再看門沖、樑壓等形勢問題' : '還沒有房間資料，先跟師傅走一遍或畫平面圖', to: lite.rooms.length ? '/plan/wizard' : '/start' })
   if (Object.keys(environment).length === 0) missing.push({ text: '尚未填寫屋外環境', to: '/environment' })
 
   const downloadMarkdown = () => {
@@ -61,7 +61,7 @@ export function ReportPage() {
   const downloadImage = async () => {
     setDownloading(true); setDlMsg(null)
     try {
-      const { svg, height } = buildReportSvg({ kind: 'annual', plan: mainFloor(floors.length ? floors : [plan]), report })
+      const { svg, height } = buildReportSvg({ kind: 'annual', plan: resolved.plan, report })
       const blob = await svgToPng(svg, 1080, height)
       const how = await shareOrDownload(blob, `fengshui-report-${report.year}.png`, '嘟嘟風水分析報告')
       setDlMsg(how === 'shared' ? '已開啟分享' : '已下載報告圖')
@@ -72,7 +72,7 @@ export function ReportPage() {
   return (
     <>
       <PageHeader title="分析報告" subtitle={`${report.year} ${report.ganzhi}年，${report.period} 運`} right={<div className="flex gap-1"><Button variant="brandSubtle" size="sm" onClick={() => setShare(true)}><Share2 />分享圖</Button><Button variant="ghost" size="icon-sm" aria-label="下載報告圖" onClick={downloadImage} disabled={downloading}><Download /></Button></div>} />
-      {share && <ShareSheet plan={mainFloor(floors.length ? floors : [plan])} report={report} onClose={() => setShare(false)} />}
+      {share && <ShareSheet plan={resolved.plan} report={report} onClose={() => setShare(false)} />}
       <Page className="space-y-5">
         {dlMsg && <p className="text-xs text-muted-foreground">{dlMsg}</p>}
         {missing.length > 0 && (

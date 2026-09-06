@@ -4,6 +4,8 @@ import { emptyPlan, newId, type FloorPlan, type Item, type Room } from '../engin
 import type { Person } from '../engine/report'
 import type { RoomType } from '../engine/floorplan'
 import type { Corner, Shape, Wall } from '../engine/wizard'
+import type { LiteRoom } from '../engine/lite'
+import { synthesizePlan } from '../engine/lite'
 
 export interface Settings {
   /** apply magnetic declination to compass readings */
@@ -53,6 +55,12 @@ const initialWizard: WizardState = { step: 0, widthM: 10, depthM: 8, shape: 'rec
 
 interface AppState {
   persons: Person[]
+  /** 新手村：不畫圖，只記房間方位 */
+  lite: { rooms: LiteRoom[]; step: number }
+  addLiteRoom: (r: Omit<LiteRoom, 'id'>) => string
+  updateLiteRoom: (id: string, patch: Partial<LiteRoom>) => void
+  removeLiteRoom: (id: string) => void
+  setLiteStep: (step: number) => void
   wizard: WizardState
   setWizard: (patch: Partial<WizardState>) => void
   resetWizard: () => void
@@ -104,6 +112,11 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       persons: [],
+      lite: { rooms: [], step: 0 },
+      addLiteRoom: (r) => { const id = newId('lr'); set((s) => ({ lite: { ...s.lite, rooms: [...s.lite.rooms, { ...r, id }] } })); return id },
+      updateLiteRoom: (id, patch) => set((s) => ({ lite: { ...s.lite, rooms: s.lite.rooms.map((r) => (r.id === id ? { ...r, ...patch } : r)) } })),
+      removeLiteRoom: (id) => set((s) => ({ lite: { ...s.lite, rooms: s.lite.rooms.filter((r) => r.id !== id) } })),
+      setLiteStep: (step) => set((s) => ({ lite: { ...s.lite, step } })),
       wizard: initialWizard,
       setWizard: (patch) => set((s) => ({ wizard: { ...s.wizard, ...patch } })),
       resetWizard: () => set({ wizard: initialWizard }),
@@ -152,7 +165,7 @@ export const useAppStore = create<AppState>()(
       setEnvironment: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
       setEnvironmentOption: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
       setConsent: () => set({ consentedAt: new Date().toISOString() }),
-      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {}, consentedAt: undefined, wizard: initialWizard }),
+      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {}, consentedAt: undefined, wizard: initialWizard, lite: { rooms: [], step: 0 } }),
     }),
     {
       name: 'dudu-fengshui-v1',
@@ -161,8 +174,17 @@ export const useAppStore = create<AppState>()(
         const raw = p.floors && p.floors.length ? p.floors : [p.plan ?? current.plan]
         const floors = raw.map((f, i) => ({ ...f, name: f.name ?? (i === 0 ? '1F' : `${i + 1}F`), level: f.level ?? i }))
         const activeFloor = Math.min(p.activeFloor ?? 0, floors.length - 1)
-        return { ...current, ...p, floors, activeFloor, plan: floors[activeFloor]!, house: { ...current.house, ...p.house }, settings: { ...current.settings, ...p.settings }, wizard: { ...current.wizard, ...p.wizard } }
+        return { ...current, ...p, floors, activeFloor, plan: floors[activeFloor]!, house: { ...current.house, ...p.house }, settings: { ...current.settings, ...p.settings }, wizard: { ...current.wizard, ...p.wizard }, lite: { ...current.lite, ...p.lite } }
       },
     },
   ),
 )
+
+/** The plan the analysis should run on: a drawn plan when one exists, else a schematic from lite rooms. */
+export function resolveAnalysisPlan(floors: FloorPlan[], plan: FloorPlan, house: HouseState, lite: { rooms: LiteRoom[] }, prefer: 'auto' | 'lite' = 'auto'): { plan: FloorPlan; floors: FloorPlan[]; synthetic: boolean } {
+  const real = prefer === 'lite' ? undefined : floors.find((f) => f.outline.length >= 3 && !f.synthetic)
+  if (real) return { plan: floors.find((f) => f.items.some((i) => i.type === 'mainDoor')) ?? real, floors: floors.filter((f) => !f.synthetic), synthetic: false }
+  const syn = synthesizePlan(house.facingBearing, lite.rooms)
+  void plan
+  return { plan: syn, floors: [syn], synthetic: true }
+}

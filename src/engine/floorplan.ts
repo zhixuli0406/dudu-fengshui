@@ -71,6 +71,8 @@ export interface FloorPlan {
   gridCm: number
   /** 照片／建商平面圖底圖（描圖用），座標為 cm */
   underlay?: Underlay
+  /** 由「新手村」方位資料合成的示意圖：只做方位型分析，跳過幾何規則 */
+  synthetic?: boolean
 }
 
 export interface Underlay {

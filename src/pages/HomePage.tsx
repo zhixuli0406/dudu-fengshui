@@ -14,12 +14,13 @@ export function HomePage() {
   const house = useAppStore((s) => s.house)
   const floors = useAppStore((s) => s.floors)
   const environment = useAppStore((s) => s.environment)
+  const lite = useAppStore((s) => s.lite)
   const fy = fengshuiYearOf(new Date())
   const period = periodOfYear(fy.year)
   const a = annualAfflictions(fy.year)
   const hasPlan = floors.some((f) => f.outline.length >= 3 && f.items.length > 0)
   const steps = [
-    { to: '/setup', title: '家庭成員與房屋', desc: persons.length ? `${persons.length} 位成員，朝向 ${Math.round(house.facingBearing)}°` : '出生年、性別、建成年', done: persons.length > 0 && house.facingSource !== 'none', icon: Users },
+    { to: '/setup', title: '家庭成員與房屋（進階設定）', desc: persons.length ? `${persons.length} 位成員，朝向 ${Math.round(house.facingBearing)}°` : '出生年、性別、建成年', done: persons.length > 0 && house.facingSource !== 'none', icon: Users },
     { to: hasPlan ? '/plan' : '/plan/wizard', title: '平面圖', desc: hasPlan ? `${floors.length} 個樓層，可微調` : '用精靈幾步完成，或掃描、拍照描圖', done: hasPlan, icon: LayoutGrid },
     { to: '/environment', title: '屋外環境', desc: Object.keys(environment).length ? `已答 ${Object.keys(environment).length} 題` : '路沖、壁刀、電塔等勾選', done: Object.keys(environment).length > 0, icon: Trees },
     { to: '/report', title: '怎麼做', desc: '由簡到繁的處理建議，進階分析另附', done: false, icon: FileText },
@@ -32,10 +33,20 @@ export function HomePage() {
         <p className="mt-1 text-sm text-muted-foreground">量朝向、畫平面圖，得到八宅、玄空飛星與形勢派的室內風水判讀。資料只留在你的手機。</p>
       </header>
 
-      <Link to={next.to} className="block rounded-xl bg-brand p-4 text-brand-foreground shadow-[var(--surface-shadow)] active:translate-y-px">
-        <div className="text-xs opacity-80">下一步</div>
-        <div className="mt-0.5 flex items-center justify-between text-base font-medium">{next.title}<ArrowRight className="size-5" /></div>
+      <Link to="/start" className="flex items-center gap-3 rounded-2xl bg-[#17181b] p-4 text-zinc-100 shadow-[var(--surface-shadow)] active:translate-y-px">
+        <MasterAvatar size={64} />
+        <span className="min-w-0 flex-1">
+          <span className="block text-base font-medium">{lite.rooms.length || house.facingSource !== 'none' ? '繼續跟師傅看房' : '跟師傅走一遍（3 分鐘）'}</span>
+          <span className="block text-xs text-zinc-400">先講大門朝哪，馬上告訴你財位在哪。不用畫圖。</span>
+        </span>
+        <ArrowRight className="size-5 text-zinc-400" />
       </Link>
+
+      {!hasPlan && !lite.rooms.length && house.facingSource === 'none' ? null : (
+      <Link to={next.to} className="block rounded-xl border border-surface-border bg-surface p-4 shadow-[var(--surface-shadow)] active:translate-y-px">
+        <div className="text-xs text-muted-foreground">下一步</div>
+        <div className="mt-0.5 flex items-center justify-between text-base font-medium">{next.title}<ArrowRight className="size-5" /></div>
+      </Link>)}
 
       <ol className="divide-y divide-surface-border rounded-xl border border-surface-border bg-surface">
         {steps.map((s, i) => (
@@ -63,11 +74,10 @@ export function HomePage() {
         </dl>
       </section>
 
-      {hasPlan && (
-        <Link to="/story" className="flex items-center gap-3 rounded-xl bg-[#17181b] p-3 text-zinc-100 shadow-[var(--surface-shadow)] active:translate-y-px">
-          <MasterAvatar size={48} />
-          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">讓師傅帶你看一遍房子</span><span className="block text-xs text-zinc-400">3D 走一圈，每間房說一段</span></span>
-          <ArrowRight className="size-5 text-zinc-400" />
+      {(hasPlan || lite.rooms.length > 0) && (
+        <Link to="/story" className="flex items-center gap-3 rounded-xl border border-surface-border bg-surface p-3 shadow-[var(--surface-shadow)] active:translate-y-px">
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">3D 看房</span><span className="block text-xs text-muted-foreground">師傅帶你走一圈，每間房說一段</span></span>
+          <ArrowRight className="size-5 text-muted-foreground" />
         </Link>
       )}
       <div className="grid grid-cols-2 gap-2">

@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, RotateCcw, RotateCw, ScanLine, Share2, Sparkles, Square, Trash2, Undo2, X } from 'lucide-react'
+import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, Plus, Redo2, RotateCcw, RotateCw, ScanLine, Share2, Sparkles, Square, Trash2, Undo2, X } from 'lucide-react'
 import { PlanEditor, type EditorMode } from '../components/PlanEditor'
 import { Page as _Page, PageHeader } from '../components/AppShell'
 import { Badge, Button, Input, NativeSelect, Segmented } from '../components/mds'
@@ -48,6 +48,23 @@ export function PlanPage() {
   const [roomDraft, setRoomDraft] = useState<Point[]>([])
   const [calDist, setCalDist] = useState(300)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // undo / redo: snapshots of the active floor
+  const history = useRef<{ past: string[]; future: string[]; last: string }>({ past: [], future: [], last: JSON.stringify(plan) })
+  const [histTick, setHistTick] = useState(0)
+  useEffect(() => {
+    const cur = JSON.stringify(plan)
+    const h = history.current
+    if (cur === h.last) return
+    if (h.past[h.past.length - 1] !== cur) { h.past.push(h.last); if (h.past.length > 40) h.past.shift(); h.future = [] }
+    h.last = cur
+    setHistTick((t) => t + 1)
+  }, [plan])
+  const undo = () => { const h = history.current; const prev = h.past.pop(); if (!prev) return; h.future.push(h.last); h.last = prev; setPlan(JSON.parse(prev)); setSelectedId(null); setHistTick((t) => t + 1) }
+  const redo = () => { const h = history.current; const nxt = h.future.pop(); if (!nxt) return; h.past.push(h.last); h.last = nxt; setPlan(JSON.parse(nxt)); setSelectedId(null); setHistTick((t) => t + 1) }
+  useEffect(() => { const onKey = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo() } }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey) })
+  void histTick
+  const canUndo = history.current.past.length > 0, canRedo = history.current.future.length > 0
 
   const selectedItem = plan.items.find((i) => i.id === selectedId)
   const selectedRoom = plan.rooms.find((r) => r.id === selectedId)
@@ -104,14 +121,14 @@ export function PlanPage() {
   return (
     <div className="mx-auto flex h-[calc(100dvh-3.75rem-env(safe-area-inset-bottom))] w-full max-w-2xl flex-col sm:border-x sm:border-surface-border">
       <PageHeader title="平面圖微調" subtitle={`${plan.name ?? '1F'}${findings.length ? `，${findings.length} 項待處理` : ''}`}
-        right={<div className="flex gap-1"><Button variant="ghost" size="icon-sm" aria-label="顯示設定" onClick={() => setSheet('display')}><Eye /></Button><Button variant="ghost" size="icon-sm" aria-label="更多" onClick={() => setSheet('menu')}><MoreHorizontal /></Button></div>} />
+        right={<div className="flex gap-1"><Button variant="ghost" size="icon-sm" aria-label="復原" onClick={undo} disabled={!canUndo}><Undo2 /></Button><Button variant="ghost" size="icon-sm" aria-label="重做" onClick={redo} disabled={!canRedo}><Redo2 /></Button><Button variant="ghost" size="icon-sm" aria-label="顯示設定" onClick={() => setSheet('display')}><Eye /></Button><Button variant="ghost" size="icon-sm" aria-label="更多" onClick={() => setSheet('menu')}><MoreHorizontal /></Button></div>} />
 
-      {floors.length > 1 && (
-        <div className="flex items-center gap-2 border-b border-surface-border bg-surface px-3 py-1.5">
-          <Segmented value={String(activeFloor)} onValueChange={(v) => { setActiveFloor(Number(v)); setSelectedId(null) }} options={floors.map((f, i) => ({ value: String(i), label: f.name ?? `L${f.level ?? 0}` }))} />
-          {crossCount > 0 && <Badge variant="destructive">樓上樓下 {crossCount}</Badge>}
-        </div>
-      )}
+      <div className="flex items-center gap-2 border-b border-surface-border bg-surface px-3 py-1.5 text-xs">
+        <span className="text-muted-foreground">樓層</span>
+        <Segmented value={String(activeFloor)} onValueChange={(v) => { setActiveFloor(Number(v)); setSelectedId(null) }} options={floors.map((f, i) => ({ value: String(i), label: f.name ?? `L${f.level ?? 0}` }))} />
+        <Button variant="ghost" size="xs" onClick={() => { addFloor({ copyOutline: true }); setMode('room') }}><Plus />加樓層</Button>
+        {crossCount > 0 && <Badge variant="destructive">樓上樓下 {crossCount}</Badge>}
+      </div>
 
       <div className="relative min-h-0 flex-1">
         <PlanEditor
