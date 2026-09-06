@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { currentScreenAngle, headingFromEuler } from '../engine/orientation'
+import { HeadingFilter } from '../engine/headingFilter'
 
 export type CompassStatus = 'idle' | 'need-permission' | 'active' | 'unsupported' | 'denied'
 
 export interface CompassReading {
-  /** magnetic heading, degrees clockwise from magnetic north (0–360) */
+  /** smoothed magnetic heading, degrees clockwise from magnetic north (0–360) */
   heading: number | null
   /** iOS webkitCompassAccuracy (degrees) or null */
   accuracy: number | null
-  /** whether the value is from an absolute (magnetometer-fused) source */
+  /** whether the value comes from an absolute (magnetometer-fused) source */
   absolute: boolean
   status: CompassStatus
   /** call inside a user gesture (iOS 13+) */
   requestPermission: () => Promise<void>
-  /** sample count since activation */
   samples: number
   /** flat = heading of device top; upright = heading of rear camera */
   mode: 'flat' | 'upright'
+  /** circular std-dev of recent raw samples (deg); < 3 is steady */
+  stability: number
 }
 
 interface IOSOrientationEvent extends DeviceOrientationEvent {
@@ -26,11 +28,10 @@ interface IOSOrientationEvent extends DeviceOrientationEvent {
 
 /**
  * Compass heading hook.
- * - iOS: `webkitCompassHeading` (magnetic heading of the device top, 0 = north) + screen rotation.
- *   [未實機驗證] 直立時 iOS 是否自動改以機背方向計算，需實機確認。
- * - Android/Chrome: `deviceorientationabsolute` alpha/beta/gamma → rotation matrix; flat → device-top heading
- *   (+ screen rotation), upright → rear-camera heading (spec appendix formula NaNs when flat, so both are derived).
- * Applies light exponential smoothing on the unit circle.
+ * Sources: iOS `webkitCompassHeading` (absolute); Android `deviceorientationabsolute` (absolute, preferred);
+ * plain `deviceorientation` alpha only as a last resort when no absolute source ever reports.
+ * Never mixes absolute and relative streams (mixing them made the needle oscillate between two headings).
+ * Smoothing: time-constant EMA on the unit circle + outlier gate + ~12 Hz UI updates.
  */
 export function useCompass(): CompassReading {
   const [heading, setHeading] = useState<number | null>(null)
@@ -39,42 +40,49 @@ export function useCompass(): CompassReading {
   const [status, setStatus] = useState<CompassStatus>('idle')
   const [samples, setSamples] = useState(0)
   const [mode, setMode] = useState<'flat' | 'upright'>('flat')
-  const smooth = useRef<{ x: number; y: number } | null>(null)
+  const [stability, setStability] = useState(0)
+  const filter = useRef(new HeadingFilter({ tauMs: 500, outlierDeg: 35, outlierConfirm: 4 }))
+  const absoluteSeen = useRef(false)
+  const modeRef = useRef<'flat' | 'upright'>('flat')
+  const lastUi = useRef(0)
+  const count = useRef(0)
 
   const onEvent = useCallback((e: DeviceOrientationEvent) => {
     const ev = e as IOSOrientationEvent
-    let h: number | null = null
-    let abs = false
-    if (typeof ev.webkitCompassHeading === 'number' && !Number.isNaN(ev.webkitCompassHeading)) {
-      h = ev.webkitCompassHeading
-      abs = true
-      if (typeof ev.webkitCompassAccuracy === 'number') setAccuracy(ev.webkitCompassAccuracy < 0 ? null : ev.webkitCompassAccuracy)
-      h = (h + currentScreenAngle() + 360) % 360
-      if (typeof ev.beta === 'number' && typeof ev.gamma === 'number') setMode(headingFromEuler(0, ev.beta, ev.gamma).mode)
-    } else if (typeof ev.alpha === 'number') {
-      abs = ev.absolute === true || e.type === 'deviceorientationabsolute'
-      const r = headingFromEuler(ev.alpha, ev.beta ?? 0, ev.gamma ?? 0, currentScreenAngle())
-      h = r.heading
-      setMode(r.mode)
+    const isAbsoluteEvent = e.type === 'deviceorientationabsolute' || ev.absolute === true || typeof ev.webkitCompassHeading === 'number'
+    if (isAbsoluteEvent) absoluteSeen.current = true
+    else if (absoluteSeen.current) return // ignore the relative stream once an absolute source exists
+    let raw: number | null = null
+    // mode with hysteresis (flat ↔ upright) from tilt only
+    if (typeof ev.beta === 'number' && typeof ev.gamma === 'number') {
+      const flatness = headingFromEuler(0, ev.beta, ev.gamma).flatness
+      if (modeRef.current === 'flat' && flatness < 0.55) modeRef.current = 'upright'
+      else if (modeRef.current === 'upright' && flatness > 0.8) modeRef.current = 'flat'
     }
-    if (h === null) return
-    // smoothing on unit circle
-    const r = (h * Math.PI) / 180
-    const v = { x: Math.cos(r), y: Math.sin(r) }
-    const a = 0.25
-    smooth.current = smooth.current ? { x: smooth.current.x * (1 - a) + v.x * a, y: smooth.current.y * (1 - a) + v.y * a } : v
-    const sh = ((Math.atan2(smooth.current.y, smooth.current.x) * 180) / Math.PI + 360) % 360
-    setHeading(sh)
-    setAbsolute(abs)
+    if (typeof ev.webkitCompassHeading === 'number' && !Number.isNaN(ev.webkitCompassHeading)) {
+      raw = (ev.webkitCompassHeading + currentScreenAngle() + 360) % 360
+      if (typeof ev.webkitCompassAccuracy === 'number') setAccuracy(ev.webkitCompassAccuracy < 0 ? null : ev.webkitCompassAccuracy)
+    } else if (typeof ev.alpha === 'number') {
+      const r = headingFromEuler(ev.alpha, ev.beta ?? 0, ev.gamma ?? 0, currentScreenAngle())
+      raw = modeRef.current === 'flat' ? r.topHeading : r.cameraHeading
+    }
+    if (raw === null) return
+    const now = performance.now()
+    const smoothed = filter.current.push(raw, now)
+    count.current += 1
+    if (now - lastUi.current < 80) return // ~12 Hz UI
+    lastUi.current = now
+    setHeading(smoothed)
+    setAbsolute(absoluteSeen.current)
+    setMode(modeRef.current)
+    setStability(filter.current.stability())
     setStatus('active')
-    setSamples((n) => n + 1)
+    setSamples(count.current)
   }, [])
 
   const attach = useCallback(() => {
     if (typeof window === 'undefined') return
-    if ('ondeviceorientationabsolute' in window) {
-      window.addEventListener('deviceorientationabsolute', onEvent as EventListener, true)
-    }
+    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', onEvent as EventListener, true)
     window.addEventListener('deviceorientation', onEvent as EventListener, true)
   }, [onEvent])
 
@@ -87,19 +95,16 @@ export function useCompass(): CompassReading {
         if (res !== 'granted') { setStatus('denied'); return }
       } catch { setStatus('denied'); return }
     }
+    filter.current.reset()
     attach()
     setStatus((s) => (s === 'active' ? s : 'need-permission'))
-    // if no events arrive within 2s, mark unsupported (desktop)
     setTimeout(() => setStatus((s) => (s === 'need-permission' ? 'unsupported' : s)), 2500)
   }, [attach])
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof DeviceOrientationEvent === 'undefined') { setStatus('unsupported'); return }
     const DOE = DeviceOrientationEvent as typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> }
-    if (typeof DOE.requestPermission === 'function') {
-      setStatus('need-permission')
-      return
-    }
+    if (typeof DOE.requestPermission === 'function') { setStatus('need-permission'); return }
     attach()
     setStatus('need-permission')
     const t = setTimeout(() => setStatus((s) => (s === 'need-permission' ? 'unsupported' : s)), 3000)
@@ -110,5 +115,5 @@ export function useCompass(): CompassReading {
     }
   }, [attach, onEvent])
 
-  return { heading, accuracy, absolute, status, requestPermission, samples, mode }
+  return { heading, accuracy, absolute, status, requestPermission, samples, mode, stability }
 }

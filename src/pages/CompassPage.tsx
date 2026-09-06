@@ -48,12 +48,13 @@ export function CompassPage() {
         <div className="rounded-xl border border-surface-border bg-surface p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="font-mono text-4xl tabular-nums">{shown == null ? '--' : shown.toFixed(1)}°</div>
+              <div className="font-mono text-4xl tabular-nums">{shown == null ? '--' : Math.round(shown)}°</div>
               {m && <div className="mt-1 text-sm">向 {m.name}山（{PALACES[m.palace].zh}宮，{PALACES[palaceOfBearing(shown!)].direction}），坐 {mountainOf(sittingOf(shown!)).name}山</div>}
             </div>
             <div className="flex flex-col items-end gap-1">
               {compass.accuracy != null && <Badge variant={compass.accuracy <= 15 ? 'good' : 'destructive'}>精度 ±{Math.round(compass.accuracy)}°</Badge>}
-              {compass.status === 'active' && <Badge variant="ghost">{compass.mode === 'flat' ? '平放：機頂方向' : '直立：鏡頭方向'}</Badge>}
+              {compass.status === 'active' && <Badge variant={compass.stability < 3 ? 'good' : compass.stability < 8 ? 'warning' : 'destructive'}>{compass.stability < 3 ? '讀數穩定' : compass.stability < 8 ? '略有飄動' : '飄動大，請遠離金屬並 8 字校正'}</Badge>}
+              {compass.status === 'active' && <Badge variant="ghost">{compass.mode === 'flat' ? '平放：機頂方向' : '直立：鏡頭方向'}{compass.absolute ? '' : '（相對值，無磁北）'}</Badge>}
             </div>
           </div>
           {kw && <p className="mt-2 text-xs text-destructive">此角度落在{kw === 'major' ? '大空亡（八卦交界）' : '小空亡（二十四山交界）'}線上，玄空以此立向不吉，請微調門向或以相鄰山為準。</p>}

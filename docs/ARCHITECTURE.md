@@ -57,7 +57,7 @@ src/store/         zustand + localStorage 持久化
 
 ## 羅盤方位
 
-`engine/orientation.ts` 依 W3C DeviceOrientation 的 Z-X'-Y'' 旋轉矩陣把 alpha／beta／gamma 轉成世界座標：機頂向量 (0,1,0) 的水平投影 = 平放時的方位（β=γ=0 時退化為 360 − α）；鏡頭向量 (0,0,−1) 的水平投影 = 直立時的方位。`flatness = |m33|` 大於 cos 45° 視為平放。螢幕旋轉：`screen.orientation.angle` 是螢幕相對自然方向的逆時針角度（規範），螢幕「上」的方位 = 機頂方位 + angle（推導：機頂朝西、逆時針轉 90° 後螢幕上方為機身右側，指北）；鏡頭方位不受 UI 旋轉影響。iOS 用 `webkitCompassHeading`（機頂方位）＋同樣的螢幕補償，直立時的行為待實機驗證。
+`engine/orientation.ts` 依 W3C DeviceOrientation 的 Z-X'-Y'' 旋轉矩陣把 alpha／beta／gamma 轉成世界座標：機頂向量 (0,1,0) 的水平投影 = 平放時的方位（β=γ=0 時退化為 360 − α）；鏡頭向量 (0,0,−1) 的水平投影 = 直立時的方位。`flatness = |m33|` 大於 cos 45° 視為平放。螢幕旋轉：`screen.orientation.angle` 是螢幕相對自然方向的逆時針角度（規範），螢幕「上」的方位 = 機頂方位 + angle（推導：機頂朝西、逆時針轉 90° 後螢幕上方為機身右側，指北）；鏡頭方位不受 UI 旋轉影響。iOS 用 `webkitCompassHeading`（機頂方位）＋同樣的螢幕補償，直立時的行為待實機驗證。來源仲裁：一旦收到絕對事件（`deviceorientationabsolute`、`absolute===true` 或 `webkitCompassHeading`）就忽略相對 `deviceorientation`，兩者混用會讓指針在兩個方向間擺盪。`engine/headingFilter.ts`：單位圓上的時間常數 EMA（τ=500 ms）、離群值閘門（>35° 需連續 4 筆才跟隨）、近 12 筆的圓形標準差作為穩定度；`unwrapAngle` 讓表盤旋轉角連續以配合 CSS 過渡。
 
 ## AR 掃描流程
 

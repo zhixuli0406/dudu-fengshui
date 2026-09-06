@@ -24,6 +24,9 @@
 - 平面圖「底圖」模式：匯入建商平面圖或手繪草圖照片（iPhone 相機可直接拍），點兩個已知距離校正比例後描圖；底圖可調透明度、旋轉、移除。這是 iOS 沒有 WebXR 時的通用替代路徑。
 - iOS AR：整合 Variant Launch（App Clip 檢視器）。`VITE_VARIANT_LAUNCH_KEY` 設定後，iOS Safari 掃描頁可交棒 Launch 檢視器取得 WebXR hit-test／anchors／DOM overlay，沿用同一套點地板建圖流程；GitHub Pages 工作流由 Secrets 注入 key。AR session 改為只硬性要求 `hit-test`；DOM overlay 改為 React 樹外節點＋portal、AR 期間頁面背景透明、ARKit 追蹤品質提示。
 
+### Fixed
+- 羅盤指針在兩個方向之間來回擺盪（Android）：原本同時採用 `deviceorientationabsolute` 與相對值 `deviceorientation` 兩條資料流；現在偵測到絕對來源後只採用絕對值。另加時間常數 0.5 秒的低通、離群值閘門（單次跳動 > 35° 不採信，連續 4 筆才跟隨）、約 12 Hz 更新節流、表盤連續角度過渡，並顯示「讀數穩定／飄動」提示。
+
 ### Changed
 - 全站重新設計：沿用 MDS 設計系統（OKLCH 語義 token、四層 surface、lucide 圖示、400/500 字重），淺色為主並跟隨系統深色；首頁改為四步驟清單與「下一步」；平面圖頁改為底部工具列＋情境面板，顯示設定與樓層操作收進面板；報告頁改為總評數字＋分頁；移除 emoji 圖示與深色金框卡片。
 - 部署目標由 Cloud Run 改為 GitHub Pages；Dockerfile 保留作為自架選項。

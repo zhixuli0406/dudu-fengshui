@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react'
+import { unwrapAngle } from '../engine/headingFilter'
 import { MOUNTAINS } from '../engine/mountains24'
 import { PALACES, TRIGRAMS_CLOCKWISE } from '../engine/bagua'
 
@@ -13,7 +15,10 @@ interface Props {
 /** 羅盤 — outer ring 360°, 24 山 ring, 八卦 ring; rotates so that north stays at compass north. */
 export function CompassDial({ heading, size = 320, marker, className }: Props) {
   const r = size / 2
-  const rot = heading == null ? 0 : -heading
+  // keep the rotation continuous so the CSS transition never spins the long way round
+  const rotRef = useRef(0)
+  useEffect(() => { if (heading != null) rotRef.current = unwrapAngle(rotRef.current, -heading) }, [heading])
+  const rot = heading == null ? 0 : unwrapAngle(rotRef.current, -heading)
   const ringOuter = r - 6
   const ringMountain = r - 40
   const ringTrigram = r - 80
@@ -26,7 +31,7 @@ export function CompassDial({ heading, size = 320, marker, className }: Props) {
         </radialGradient>
       </defs>
       <circle cx={r} cy={r} r={ringOuter + 4} fill="url(#dialBg)" stroke="var(--surface-border)" strokeWidth={2} />
-      <g transform={`rotate(${rot} ${r} ${r})`}>
+      <g style={{ transform: `rotate(${rot}deg)`, transformOrigin: `${r}px ${r}px`, transition: 'transform 140ms linear' }}>
         {/* degree ticks */}
         {Array.from({ length: 72 }, (_, i) => {
           const a = i * 5
