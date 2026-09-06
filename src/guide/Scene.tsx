@@ -15,6 +15,11 @@ export const choiceCls = (primary?: boolean, extra?: string) =>
   cn('w-full rounded-xl border px-4 py-3 text-center text-[15px] font-medium transition active:scale-[0.98]',
     primary ? 'border-brand bg-brand text-brand-foreground' : 'border-white/15 bg-white/[0.04] text-zinc-100', extra)
 
+/** The way out of a question: never block, always offer a smaller step. */
+export function Escape({ label, onPick }: { label: string; onPick: () => void }) {
+  return <button className="mt-4 w-full py-2 text-center text-sm text-zinc-400 underline underline-offset-4" onClick={onPick}>{label}</button>
+}
+
 /**
  * Dialogue beat: the master says a few lines (tap to hurry), then choices appear.
  * Mount with a React `key` per scene so the line counter resets.

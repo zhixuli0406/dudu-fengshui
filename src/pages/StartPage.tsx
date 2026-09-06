@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Compass, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ArrowLeft, X } from 'lucide-react'
 import { DirectionPad } from '../components/DirectionPad'
 import { resolveAnalysisPlan, useAppStore } from '../store/useAppStore'
 import { PALACES, type Trigram } from '../engine/bagua'
@@ -14,7 +14,8 @@ import { NINE_STARS, RATING_ZH } from '../engine/stars'
 import { periodOfYear } from '../engine/xuankong'
 import { buildActions } from '../engine/advice'
 import { BUILT_CHOICES, FACING_WHY, firstStep, nextStep, pendingRoomType, prevStep, progressOf, roomMenu, type GuideCtx, type StepId } from '../guide/script'
-import { Scene, choiceCls } from '../guide/Scene'
+import { Escape, Scene, choiceCls } from '../guide/Scene'
+import { DoorCompass } from '../guide/DoorCompass'
 import { cn } from '../lib/utils'
 
 const MASTER = '嘟嘟師傅'
@@ -31,7 +32,6 @@ export function StartPage() {
   const step: StepId = lite.stepId ?? firstStep(ctx)
   const resolved = useMemo(() => resolveAnalysisPlan(floors, plan, house, lite, 'lite'), [floors, plan, house, lite])
   const report = useMemo(() => { try { return buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: resolved.plan, floors: resolved.floors, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode }) } catch { return null } }, [persons, house, resolved])
-  const facingPalace = house.facingSource !== 'none' ? (report?.xuankong.chart.facingPalace ?? null) : null
   const [adding, setAdding] = useState(false)
   const goTo = (id: StepId) => { setLite({ stepId: id }); setAdding(false) }
   const back = () => {
@@ -67,11 +67,9 @@ export function StartPage() {
 
   if (step === 'door') {
     body = (
-      <Ask kicker="站在門裡" ask="往外看，大門對著哪個方向？" why="向差一格，財位就換邊。">
-        <DirectionPad value={facingPalace} onChange={(t) => { setHouse({ facingBearing: PALACES[t].bearing, facingSource: 'manual' }); later('owner') }}
-          center={<Link to="/compass?return=/start" className="flex size-14 flex-col items-center justify-center rounded-full border border-brand/60 bg-brand/15 text-brand"><Compass className="size-5" /><span className="text-[10px]">羅盤</span></Link>} />
-        <p className="mt-2 text-right text-[11px] text-zinc-500">上方為北。點中間用手機羅盤實測最準。</p>
-        {facingPalace && <button className={choiceCls(true, 'mt-4')} onClick={() => goTo('owner')}>朝{PALACES[facingPalace].direction}{house.facingSource === 'compass' ? `（羅盤 ${Math.round(house.facingBearing)}°）` : ''}，沒錯</button>}
+      <Ask kicker="站在門裡" ask="大門朝哪個方向？" why="方向差一格，財位就換邊。">
+        <DoorCompass current={house.facingSource !== 'none' ? house.facingBearing : null} onKeep={() => goTo('owner')}
+          onConfirm={(bearing, source) => { setHouse({ facingBearing: bearing, facingSource: source }); later('owner') }} />
       </Ask>
     )
   }
@@ -236,10 +234,6 @@ function Ask({ kicker, ask, why, children }: { kicker?: string; ask: string; why
       <div className="mt-5">{children}</div>
     </div>
   )
-}
-
-function Escape({ label, onPick }: { label: string; onPick: () => void }) {
-  return <button className="mt-4 w-full py-2 text-center text-sm text-zinc-400 underline underline-offset-4" onClick={onPick}>{label}</button>
 }
 
 const fieldCls = 'h-12 w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 text-base text-zinc-100 placeholder:text-zinc-500 focus:border-brand focus:outline-none'
