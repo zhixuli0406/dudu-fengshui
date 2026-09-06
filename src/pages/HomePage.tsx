@@ -7,6 +7,7 @@ import { fengshuiYearOf } from '../engine/calendar'
 import { periodOfYear } from '../engine/xuankong'
 import { annualAfflictions, palaceLabel } from '../engine/annual'
 import { cn } from '../lib/utils'
+import { MasterAvatar } from '../components/MasterAvatar'
 
 export function HomePage() {
   const persons = useAppStore((s) => s.persons)
@@ -62,6 +63,13 @@ export function HomePage() {
         </dl>
       </section>
 
+      {hasPlan && (
+        <Link to="/story" className="flex items-center gap-3 rounded-xl bg-[#17181b] p-3 text-zinc-100 shadow-[var(--surface-shadow)] active:translate-y-px">
+          <MasterAvatar size={48} />
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">讓師傅帶你看一遍房子</span><span className="block text-xs text-zinc-400">3D 走一圈，每間房說一段</span></span>
+          <ArrowRight className="size-5 text-zinc-400" />
+        </Link>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <Link to="/compass"><Button variant="outline" className="w-full"><Compass />羅盤量向</Button></Link>
         <Link to="/knowledge"><Button variant="outline" className="w-full">知識庫</Button></Link>

@@ -81,6 +81,10 @@ src/store/         zustand + localStorage 持久化
 
 `engine/advice.ts` 把報告轉成 `ActionItem[]`：形勢／外局 finding 的每條化解以關鍵字分級（`classifyRemedy`：裝修 > 搬動 > 小添購 > 免費），項目歸入最簡單那級並保留更徹底的做法；八宅凶方、有房間的流年煞方、凶飛星組合另產生項目。`PLAIN` 表把規則 id 翻成白話標題與一句原因。`plainSummary` 產生摘要段落。
 
+## 師傅看房（story）
+
+`story/chapters.ts` 從 Report＋FloorPlan 產生章節（序、大門、每個房間、流年、財位、總結），每章有鏡頭指令（orbit／door／room／top）、對話泡泡、段落與待辦，文案用師傅第一人稱，測試檢查沒有「不是…而是」與破折號。`story/house3d.ts` 以 three.js 把平面圖建成 3D（cm→m，plan (x,y)→world (x,0,y)；外牆 BoxGeometry、隔間較矮較透、門窗貼牆、家具依高度表、facing 轉 rotation.y、Canvas sprite 標籤；八宮扇形 RingGeometry 貼地可上色與強調），鏡頭以 lerp 追目標位置，封面自動環繞。`pages/StoryPage.tsx` 是全螢幕深色劇場，底部導覽在此路由隱藏。
+
 ## 分享圖
 
 `src/share/shareCard.ts` 以字串組出 SVG：`buildShareSvg` 為 1080×1350 單層分享卡，`buildReportSvg` 為高度依內容伸縮的完整報告長圖（共用 `drawPlan`），`svgToPng` 用 `<img>`＋canvas 轉 PNG（2×，總像素上限 1,600 萬以符合 iOS canvas 限制），`shareOrDownload` 優先 Web Share（files），否則下載。只用系統字型，SVG 作為圖片繪入 canvas 時才能正確顯示中文。

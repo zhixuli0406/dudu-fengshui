@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Download, Share2 } from 'lucide-react'
+import { ChevronRight, Download, Share2 } from 'lucide-react'
+import { MasterAvatar } from '../components/MasterAvatar'
 import { ShareSheet } from '../components/ShareSheet'
 import { buildReportSvg, shareOrDownload, svgToPng } from '../share/shareCard'
 import { Page, PageHeader } from '../components/AppShell'
@@ -80,6 +81,11 @@ export function ReportPage() {
           </ul>
         )}
 
+        <Link to="/story" className="flex items-center gap-3 rounded-xl bg-[#17181b] p-3 text-zinc-100 shadow-[var(--surface-shadow)] active:translate-y-px">
+          <MasterAvatar size={48} />
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium">讓師傅帶你看一遍房子</span><span className="block text-xs text-zinc-400">3D 走一圈，每間房說一段</span></span>
+          <ChevronRight className="size-5 text-zinc-400" />
+        </Link>
         <Segmented value={view} onValueChange={setView} className="w-full" size="lg" options={[{ value: 'simple', label: '怎麼做' }, { value: 'advanced', label: '進階分析' }]} />
 
         {view === 'simple' && (<>

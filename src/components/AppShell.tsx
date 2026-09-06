@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col bg-app-shell">
       <main className="flex-1 pb-[calc(3.75rem+env(safe-area-inset-bottom))]">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-surface-border bg-surface/95 backdrop-blur safe-b no-print">
+      {!loc.pathname.startsWith('/story') && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-surface-border bg-surface/95 backdrop-blur safe-b no-print">
         <ul className="mx-auto flex max-w-2xl">
           {NAV.map((t) => (
             <li key={t.to} className="flex-1">
@@ -42,7 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           </li>
         </ul>
-      </nav>
+      </nav>}
       {more && <MoreSheet onClose={() => setMore(false)} />}
     </div>
   )

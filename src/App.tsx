@@ -13,6 +13,7 @@ import { EnvironmentPage } from './pages/EnvironmentPage'
 import { PrivacyPage } from './pages/PrivacyPage'
 
 const KnowledgePage = lazy(() => import('./pages/KnowledgePage').then((m) => ({ default: m.KnowledgePage })))
+const StoryPage = lazy(() => import('./pages/StoryPage').then((m) => ({ default: m.StoryPage })))
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/report" element={<ReportPage />} />
         <Route path="/environment" element={<EnvironmentPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/story" element={<Suspense fallback={<div className="p-6 text-sm text-muted-foreground">師傅準備中…</div>}><StoryPage /></Suspense>} />
         <Route path="/knowledge" element={<Suspense fallback={<div className="p-6 text-sm text-muted-foreground">載入知識庫…</div>}><KnowledgePage /></Suspense>} />
       </Routes>
       <ConsentGate />
