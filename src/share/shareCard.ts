@@ -126,7 +126,8 @@ function drawPlan(parts: string[], plan: FloorPlan, report: Report, kind: ShareK
   const clipId = `clip-${Math.round(AX)}-${Math.round(AY)}`
   parts.push(`<defs><clipPath id="${clipId}"><polygon points="${outline.map(P).join(' ')}"/></clipPath></defs>`)
   const anchors = palaceAnchors(outline, plan.northOffset)
-  const A = (t: Trigram) => ({ x: X(anchors[t].x), y: Y(anchors[t].y), small: anchors[t].n < 12 })
+  const maxN = Math.max(...TRIGRAMS_CLOCKWISE.map((t) => anchors[t].n))
+  const A = (t: Trigram) => ({ x: X(anchors[t].x), y: Y(anchors[t].y), small: anchors[t].n < maxN * 0.35 })
   if (kind !== 'form') {
     const info = palaceInfo(report, kind)
     parts.push(`<g clip-path="url(#${clipId})">`)

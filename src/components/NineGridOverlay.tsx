@@ -48,6 +48,7 @@ export function NineGridOverlay({ center, radius, northOffset, style, bounds, in
   const R = radius
   const hasOutline = !!outline && outline.length >= 3
   const anchors = hasOutline ? palaceAnchors(outline!, northOffset) : null
+  const maxN = anchors ? Math.max(...TRIGRAMS_CLOCKWISE.map((t) => anchors[t].n)) : 0
   const clipId = `palace-clip-${Math.round(center.x)}-${Math.round(center.y)}`
   return (
     <g pointerEvents="none">
@@ -64,7 +65,7 @@ export function NineGridOverlay({ center, radius, northOffset, style, bounds, in
       {TRIGRAMS_CLOCKWISE.map((t) => {
         const i = info?.[t]
         const mid = anchors ? anchors[t] : polar(center, R * 0.72, PALACES[t].bearing - northOffset)
-        const small = anchors ? anchors[t].n < 12 : false
+        const small = anchors ? anchors[t].n < maxN * 0.35 : false
         return (
           <g key={t}>
             <text x={mid.x} y={mid.y} textAnchor="middle" fontSize={small ? fontSize * 0.8 : fontSize} fill="var(--foreground)" fontWeight={500}>{small ? PALACES[t].direction : `${PALACES[t].zh}·${PALACES[t].direction}`}</text>
