@@ -7,68 +7,121 @@ import { analyzePerson, groupZh } from '../engine/bazhai'
 import { fengshuiYearOf } from '../engine/calendar'
 import { buildReport, type Report } from '../engine/report'
 import { palaceLabel } from '../engine/annual'
-import { ROOM_ZH } from '../engine/floorplan'
+import { emptyPlan, newId, ROOM_ZH, type FloorPlan } from '../engine/floorplan'
 import { periodOfYear } from '../engine/xuankong'
 import { buildActions } from '../engine/advice'
 import { keyItemFor, placeAgainstWall } from '../engine/wizard'
 import { deriveWizardPlan, ITEM_WHY } from '../engine/wizardPlan'
+import { DOOR_STAND, floorName, HOME_TYPES, homeTypeInfo, type HomeType } from '../engine/homeTypes'
 import { buildChapters } from '../story/chapters'
-import { BUILT_CHOICES, firstStep, isStepId, nextStep, prevStep, progressOf, roomStops, type GuideCtx, type Move, type StepId } from '../guide/script'
+import { detectAR, openInLaunchViewer, type ARCapability } from '../ar/providers'
+import { BUILT_CHOICES, firstStep, floorSource, isStepId, nextStep, prevStep, progressOf, roomStops, type GuideCtx, type Move, type StepId } from '../guide/script'
 import { Escape, Scene, choiceCls } from '../guide/Scene'
 import { DoorCompass } from '../guide/DoorCompass'
 import { PaintStep, SizeStep, WallStep } from '../guide/PlanSteps'
+import { WalkStep, arUsable } from '../guide/WalkStep'
 import { PalaceRose, type RoseTone } from '../guide/PalaceRose'
 import { cn } from '../lib/utils'
 
 const MASTER = '嘟嘟師傅'
 const dirZh = (t: Trigram | 'center') => (t === 'center' ? '中宮' : PALACES[t].direction)
+const FLOOR_CHOICES = [2, 3, 4, 5]
 
 /**
- * 師傅來看房：one question per screen, asked in the master's voice. Door by compass, people, period,
- * a reveal, then the house is sketched from the doorway (size → paint rooms → key furniture per room)
- * and every room gets its verdict. Pure flow logic lives in guide/script.ts.
+ * 師傅來看房：one question per screen, asked in the master's voice. Home type → door by compass → people →
+ * period → reveal → each floor is walked with the camera (AR) or sketched from the doorway → every room
+ * gets its verdict → summary. Pure flow logic lives in guide/script.ts.
  */
 export function StartPage() {
   const nav = useNavigate()
-  const { house, setHouse, persons, addPerson, removePerson, lite, setLite, floors, plan, wizard, setWizard, setFloors, addItem, updateItem } = useAppStore()
-  const hasPlan = plan.outline.length >= 3 && !plan.synthetic
-  const ctx = useMemo<GuideCtx>(() => ({ introSeen: !!lite.introSeen, hasFacing: house.facingSource !== 'none', persons: persons.length, rooms: hasPlan ? roomStops(plan.rooms) : [], pendingId: lite.pendingId }), [lite.introSeen, lite.pendingId, house.facingSource, persons.length, plan.rooms, hasPlan])
+  const { house, setHouse, persons, addPerson, removePerson, lite, setLite, floors, plan, wizard, setWizard, setFloors } = useAppStore()
+  const [cap, setCap] = useState<ARCapability | null>(null)
+  useEffect(() => { detectAR().then(setCap) }, [])
+  const arAvailable = arUsable(cap)
+
+  const homeType: HomeType = house.homeType ?? 'unit'
+  const floorCount = house.floorCount ?? (house.homeType ? (homeTypeInfo(homeType).floors === 'ask' ? 3 : (homeTypeInfo(homeType).floors as number)) : 1)
+  const floorIdx = Math.min(lite.floorIdx ?? 0, Math.max(0, floorCount - 1))
+  const floorPlan: FloorPlan | undefined = floors[floorIdx]
+  const ctx = useMemo<GuideCtx>(() => ({
+    introSeen: !!lite.introSeen, hasFacing: house.facingSource !== 'none', persons: persons.length, arAvailable, floorCount, floorIdx,
+    floorRooms: Array.from({ length: floorCount }, (_, i) => (floors[i] && !floors[i]!.synthetic ? roomStops(floors[i]!) : [])),
+    floorSources: Array.from({ length: floorCount }, (_, i) => floorSource(floors[i]?.synthetic ? undefined : floors[i])),
+    pendingId: lite.pendingId,
+  }), [lite.introSeen, lite.pendingId, house.facingSource, persons.length, arAvailable, floorCount, floorIdx, floors])
   const step: StepId = isStepId(lite.stepId) ? lite.stepId : firstStep(ctx)
   const resolved = useMemo(() => resolveAnalysisPlan(floors, plan, house, lite), [floors, plan, house, lite])
   const report = useMemo(() => { try { return buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: resolved.plan, floors: resolved.floors, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode }) } catch { return null } }, [persons, house, resolved])
-  const chapters = useMemo(() => (report ? buildChapters(report, resolved.plan, MASTER) : []), [report, resolved.plan])
-  const derived = useMemo(() => deriveWizardPlan(wizard, house.facingBearing), [wizard, house.facingBearing])
+  const chapters = useMemo(() => (report && floorPlan ? buildChapters(report, floorPlan, MASTER) : []), [report, floorPlan])
+  const upper = floorIdx > 0
+  const fName = floorName(homeType, floorIdx)
+  const derived = useMemo(() => deriveWizardPlan(wizard, house.facingBearing, { upper, northOffset: floors[0]?.northOffset, name: fName, level: floorIdx }), [wizard, house.facingBearing, upper, floors, fName, floorIdx])
   const [adding, setAdding] = useState(false)
-  const move = (m: Move) => { setLite({ stepId: m.id, pendingId: m.pendingId }); setAdding(false) }
+  const move = (m: Move) => { setLite({ stepId: m.id, pendingId: m.pendingId, floorIdx: m.floorIdx ?? lite.floorIdx ?? 0 }); setAdding(false) }
   const goTo = (id: StepId) => move({ id })
   const later = (m: Move) => window.setTimeout(() => move(m), 380)
   const back = () => { const p = prevStep(step, ctx); if (p) move(p); else nav('/') }
   const { n, total } = progressOf(step)
-  const pendingRoom = plan.rooms.find((r) => r.id === lite.pendingId)
+  const pendingRoom = floorPlan?.rooms.find((r) => r.id === lite.pendingId)
   const owner = persons[0]
-  const isScene = step === 'intro' || step === 'reveal' || step === 'roomVerdict' || step === 'summary'
-  const afterDoor = step !== 'intro' && step !== 'door'
+  const isScene = step === 'intro' || step === 'reveal' || step === 'roomVerdict' || step === 'upstairs' || step === 'summary'
+  const afterDoor = !['intro', 'home', 'door'].includes(step)
   const roomStep = step === 'furniture' || step === 'roomVerdict'
+
+  /** Replace one floor's plan, padding the list so `floors[idx]` exists. */
+  const saveFloor = (idx: number, p: FloorPlan) => {
+    const next = [...floors]
+    while (next.length <= idx) next.push(emptyPlan(floorName(homeType, next.length), next.length))
+    next[idx] = { ...p, name: floorName(homeType, idx), level: idx }
+    setFloors(next)
+    return next
+  }
+  /** Context as it will be once `floors` is replaced (store updates land after this render). */
+  const ctxWith = (nextFloors: FloorPlan[], patch: Partial<GuideCtx> = {}): GuideCtx => ({ ...ctx, floorRooms: nextFloors.map((f) => roomStops(f)), floorSources: nextFloors.map((f) => floorSource(f)), ...patch })
 
   // guards: a step that needs data the user has not given yet falls back to where it is asked
   useEffect(() => {
     if (afterDoor && house.facingSource === 'none') goTo('door')
-    else if (roomStep && !pendingRoom) goTo('paint')
+    else if (roomStep && !pendingRoom) move(ctx.floorSources[floorIdx] === 'none' ? { id: arAvailable ? 'build' : 'size', floorIdx } : { id: 'summary' })
+    else if ((step === 'build' || step === 'walk') && cap && !arAvailable) move({ id: 'size', floorIdx })
     else if (step === 'size' && wizard.doorWall !== 'bottom') setWizard({ doorWall: 'bottom' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, house.facingSource, pendingRoom, wizard.doorWall])
+  }, [step, house.facingSource, pendingRoom, wizard.doorWall, cap, arAvailable])
 
   let body: ReactNode = null
 
   if (step === 'intro') {
-    const start = () => { setLite({ introSeen: true }); goTo('door') }
+    const start = () => { setLite({ introSeen: true }); goTo('home') }
     body = <Scene key="intro" name={MASTER} lines={['到了。', '先別急著開門。房子要從門口看起，門是氣口，門看對了，屋裡的事才好談。']}
-      choices={[{ label: '好，從門口開始', primary: true, onPick: start }, { label: '我只想知道財位在哪', reply: '財位也得先看門。來，站到門裡。', onPick: start }]} />
+      choices={[{ label: '好，從門口開始', primary: true, onPick: start }, { label: '我只想知道財位在哪', reply: '財位也得先看門。來，先告訴我這是什麼樣的房子。', onPick: start }]} />
+  }
+
+  if (step === 'home') {
+    const info = house.homeType ? homeTypeInfo(house.homeType) : null
+    body = (
+      <Ask kicker="門口" ask="這是什麼樣的房子？" why="幾層樓一起看，樓上樓下才對得起來。">
+        <div className="grid gap-2">
+          {HOME_TYPES.map((h) => (
+            <button key={h.id} className={choiceCls(house.homeType === h.id, 'flex flex-col items-start py-2.5 text-left')} onClick={() => { const fc = h.floors === 'ask' ? (house.floorCount && house.floorCount > 1 ? house.floorCount : 3) : h.floors; setHouse({ homeType: h.id, floorCount: fc }); if (h.floors !== 'ask') later({ id: 'door' }) }}>
+              <span>{h.label}<span className="ml-2 text-xs opacity-70">{h.hint}</span></span>
+              <span className="text-xs opacity-60">{h.examples}</span>
+            </button>
+          ))}
+        </div>
+        {info?.floors === 'ask' && (
+          <div className="mt-3">
+            <div className="mb-1.5 text-xs text-zinc-400">住的部分有幾層？（含一樓）</div>
+            <div className="grid grid-cols-4 gap-2">{FLOOR_CHOICES.map((c) => <button key={c} className={choiceCls(house.floorCount === c)} onClick={() => setHouse({ floorCount: c })}>{c} 層</button>)}</div>
+            <button className={choiceCls(true, 'mt-3')} onClick={() => goTo('door')}>就這樣</button>
+          </div>
+        )}
+      </Ask>
+    )
   }
 
   if (step === 'door') {
     body = (
-      <Ask kicker="站在門裡" ask="大門朝哪個方向？" why="方向差一格，財位就換邊。">
+      <Ask kicker="站在門裡" ask="大門朝哪個方向？" why={`${DOOR_STAND[homeType]}方向差一格，財位就換邊。`}>
         <DoorCompass current={house.facingSource !== 'none' ? house.facingBearing : null} onKeep={() => goTo('owner')}
           onConfirm={(bearing, source) => { setHouse({ facingBearing: bearing, facingSource: source }); later({ id: 'owner' }) }} />
       </Ask>
@@ -120,7 +173,7 @@ export function StartPage() {
       const best = primary.bestDirections[0]!
       lines.push(`${primary.person.name}是${PALACES[primary.gua].zh}命，${groupZh(primary.group)}命。${primary.compatible ? '跟這房子同一組，順。' : `跟房子不同組，不要緊，床頭朝${PALACES[best].direction}就補得回來。`}`)
     }
-    lines.push('接下來我要看屋裡。你站在門口，跟我描一下房子的樣子，一分鐘就好。')
+    lines.push(arAvailable ? '接下來我要看屋裡。拿著手機跟我走一圈，門窗家具的位置和朝向我自己算。' : '接下來我要看屋裡。你站在門口，跟我描一下房子的樣子，一分鐘就好。')
     const cells = Object.fromEntries([
       ...report.bazhai.wealthLeak.map((t) => [t, { label: '洩財', tone: 'muted' }]),
       ...report.bazhai.wenchang.filter((t) => (t as string) !== 'center').map((t) => [t, { label: '文昌', tone: 'info' }]),
@@ -130,32 +183,67 @@ export function StartPage() {
       choices={[{ label: '好，進屋', primary: true, onPick: () => move(nextStep('reveal', ctx)) }, { label: '先這樣，看清單', onPick: () => nav('/report') }]} />
   }
 
-  if (step === 'size') {
-    const foreign = hasPlan && plan.rooms.length > 0 && !plan.rooms.every((r) => r.id.startsWith('wz_'))
+  if (step === 'build') {
+    const needsLaunch = !!cap && !cap.nativeXR && cap.ios && cap.providerConfigured
     body = (
-      <Ask kicker="進屋了" ask="房子大概多大？" why="站在大門往裡看：左右多寬、往裡多深。">
-        <SizeStep wizard={wizard} setWizard={setWizard} derived={derived} onNext={() => goTo('paint')} onUseExisting={foreign ? () => move(nextStep('paint', ctx)) : undefined} />
+      <Ask kicker={upper ? `到${fName}了` : '進屋了'} ask={`${upper ? `${fName}` : '屋裡'}怎麼給我看？`} why="用鏡頭走一圈最準：門窗、家具的位置和朝向，我自己會算。">
+        <div className="grid gap-2">
+          <button className={choiceCls(true)} onClick={() => { if (needsLaunch && cap) { openInLaunchViewer(cap); return } move({ id: 'walk', floorIdx }) }}>{needsLaunch ? '在 iPhone 開啟鏡頭，跟我走一圈' : '拿鏡頭跟我走一圈'}</button>
+          <button className={choiceCls()} onClick={() => move({ id: 'size', floorIdx })}>用畫的，站在門口描一下</button>
+        </div>
+        {needsLaunch && <p className="mt-2 text-xs text-zinc-500">iPhone 會先開啟一個小程式（App Clip）來用鏡頭，之後回到這裡繼續。</p>}
+      </Ask>
+    )
+  }
+
+  if (step === 'walk') {
+    body = (
+      <Ask kicker={upper ? `到${fName}了` : '進屋了'} ask="拿著手機，跟我走一圈。" why="外牆、房間、門窗、家具，一次點完。">
+        <WalkStep upper={upper} floorName={fName} onSketch={() => move({ id: 'size', floorIdx })}
+          onDone={(captured) => {
+            // north: floor 0 trusts the door reading taken earlier; upper floors keep the AR compass or inherit
+            let p = captured
+            const md = p.items.find((i) => i.type === 'mainDoor')
+            if (!upper && md) p = { ...p, northOffset: (((house.facingBearing - (md.facing + 180)) % 360) + 360) % 360 }
+            else if (upper && floors[0]) p = { ...p, northOffset: p.northOffset || floors[0].northOffset }
+            const next = saveFloor(floorIdx, p)
+            move(nextStep('walk', ctxWith(next)))
+          }} />
+      </Ask>
+    )
+  }
+
+  if (step === 'size') {
+    const existing = floorPlan && !floorPlan.synthetic && floorPlan.rooms.length > 0 && ctx.floorSources[floorIdx] !== 'sketch'
+    body = (
+      <Ask kicker={upper ? `到${fName}了，站在樓梯口` : '進屋了'} ask={`${upper ? fName : '房子'}大概多大？`} why={upper ? '跟一樓同一個方向畫：樓梯口那面在下，左右多寬、往裡多深。' : '站在大門往裡看：左右多寬、往裡多深。'}>
+        <SizeStep wizard={wizard} setWizard={setWizard} derived={derived} upper={upper} onNext={() => move({ id: 'paint', floorIdx })} onUseExisting={existing ? () => move(nextStep('paint', ctx)) : undefined} />
       </Ask>
     )
   }
 
   if (step === 'paint') {
-    const save = () => { setFloors([derived.plan]); return roomStops(derived.plan.rooms) }
     body = (
       <Ask kicker="畫房間" ask="房間各在哪裡？" why="先點一種房間，再點格子。不用塗滿，塗錯再點一次就清掉。">
-        <PaintStep wizard={wizard} setWizard={setWizard} derived={derived} onDone={() => { const rooms = save(); move(nextStep('paint', { ...ctx, rooms })) }} onSkip={() => { save(); goTo('summary') }} />
+        <PaintStep wizard={wizard} setWizard={setWizard} derived={derived}
+          onDone={() => { const next = saveFloor(floorIdx, derived.plan); move(nextStep('paint', ctxWith(next))) }}
+          onSkip={() => { const next = saveFloor(floorIdx, derived.plan); move(nextStep('roomVerdict', ctxWith(next, { pendingId: undefined }))) }} />
       </Ask>
     )
   }
 
-  if (step === 'furniture' && pendingRoom) {
+  if (step === 'furniture' && pendingRoom && floorPlan) {
     const key = keyItemFor(pendingRoom.type)
     if (key) {
-      const existing = plan.items.find((i) => i.roomId === pendingRoom.id && i.type === key.item)
       body = (
-        <Ask kicker={`站在${ROOM_ZH[pendingRoom.type]}裡`} ask={key.question} why={ITEM_WHY[key.item]}>
-          <WallStep room={pendingRoom} plan={plan} onSkip={() => move(nextStep('furniture', ctx))}
-            onPick={(wall) => { const placed = placeAgainstWall(pendingRoom, key.item, wall); if (existing) updateItem(existing.id, placed); else addItem(placed); later(nextStep('furniture', ctx)) }} />
+        <Ask kicker={`站在${fName}的${ROOM_ZH[pendingRoom.type]}裡`} ask={key.question} why={ITEM_WHY[key.item]}>
+          <WallStep room={pendingRoom} plan={floorPlan} onSkip={() => move(nextStep('furniture', ctx))}
+            onPick={(wall) => {
+              const placed = { ...placeAgainstWall(pendingRoom, key.item, wall), id: newId('i') }
+              const others = floorPlan.items.filter((i) => !(i.roomId === pendingRoom.id && i.type === key.item))
+              const next = saveFloor(floorIdx, { ...floorPlan, items: [...others, placed] })
+              later(nextStep('furniture', ctxWith(next)))
+            }} />
         </Ask>
       )
     }
@@ -164,9 +252,15 @@ export function StartPage() {
   if (step === 'roomVerdict' && pendingRoom && report) {
     const ch = chapters.find((c) => c.roomId === pendingRoom.id)
     const next = nextStep('roomVerdict', ctx)
-    body = <Scene key={`verdict_${pendingRoom.id}`} lines={ch?.paragraphs.length ? ch.paragraphs : ['這間我看過了，沒什麼要說的。']}
+    body = <Scene key={`verdict_${floorIdx}_${pendingRoom.id}`} lines={ch?.paragraphs.length ? ch.paragraphs : ['這間我看過了，沒什麼要說的。']}
       aside={ch?.todos.length ? <ul className="space-y-1 rounded-xl bg-white/8 p-3 text-sm text-zinc-200">{ch.todos.map((t, i) => <li key={i} className="flex gap-2"><span className="text-brand">•</span><span>{t}</span></li>)}</ul> : undefined}
-      choices={next.id === 'summary' ? [{ label: '聽結論', primary: true, onPick: () => move(next) }] : [{ label: '下一間', primary: true, onPick: () => move(next) }, { label: '夠了，聽結論', onPick: () => goTo('summary') }]} />
+      choices={next.id === 'summary' ? [{ label: '聽結論', primary: true, onPick: () => move(next) }] : next.id === 'upstairs' ? [{ label: '這層看完了', primary: true, onPick: () => move(next) }] : [{ label: '下一間', primary: true, onPick: () => move(next) }, { label: '夠了，聽結論', onPick: () => goTo('summary') }]} />
+  }
+
+  if (step === 'upstairs') {
+    const nextName = floorName(homeType, floorIdx + 1)
+    body = <Scene key={`up_${floorIdx}`} lines={[`${fName}看完了。`, `上樓。${nextName}也照樣走一遍，樓梯口記得標出來，樓上樓下我才對得起來。`]}
+      choices={[{ label: `上${nextName}`, primary: true, onPick: () => { setWizard({ paint: {}, walls: {} }); move(nextStep('upstairs', ctx)) } }, { label: '樓上不看了，聽結論', onPick: () => goTo('summary') }]} />
   }
 
   if (step === 'summary' && report) {
@@ -181,10 +275,10 @@ export function StartPage() {
       <header className="relative z-10 flex h-12 shrink-0 items-center gap-3 px-3 safe-t">
         <button className="flex size-9 items-center justify-center rounded-full bg-white/10" onClick={back} aria-label={prevStep(step, ctx) ? '上一題' : '離開'}>{prevStep(step, ctx) ? <ArrowLeft className="size-5" /> : <X className="size-5" />}</button>
         <div className="h-px flex-1 overflow-hidden bg-white/10"><div className="h-full bg-brand transition-[width] duration-500" style={{ width: `${(n / total) * 100}%` }} /></div>
-        {step === 'intro' ? <button className="text-xs text-zinc-400" onClick={() => { setLite({ introSeen: true }); goTo('door') }}>跳過</button> : <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{n} / {total}</span>}
+        {step === 'intro' ? <button className="text-xs text-zinc-400" onClick={() => { setLite({ introSeen: true }); goTo('home') }}>跳過</button> : <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{n} / {total}</span>}
       </header>
       <main className="relative z-10 flex flex-1 flex-col justify-end overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-        <div key={`${step}_${lite.pendingId ?? ''}`} className={cn('mx-auto w-full max-w-md guide-enter', isScene && 'pb-2')}>{body}</div>
+        <div key={`${step}_${floorIdx}_${lite.pendingId ?? ''}`} className={cn('mx-auto w-full max-w-md guide-enter', isScene && 'pb-2')}>{body}</div>
       </main>
     </div>
   )

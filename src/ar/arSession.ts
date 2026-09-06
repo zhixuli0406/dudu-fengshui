@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import type { ItemType } from '../engine/floorplan'
+import { ITEM_ZH } from '../engine/floorplan'
 
 /**
  * WebXR AR room capture (hit-test based). Works on Chrome Android / Samsung Internet / Quest / visionOS,
@@ -8,22 +10,27 @@ import * as THREE from 'three'
  * Coordinates are metres in the XR reference space (x right, −z forward at session start, y up).
  */
 export interface ARPoint { x: number; y: number; z: number }
-export type CaptureStage = 'outline' | 'room' | 'opening'
+export type CaptureStage = 'outline' | 'room' | 'opening' | 'item'
 export type OpeningKind = 'mainDoor' | 'door' | 'window'
 export interface CapturedPolygon { stage: 'outline' | 'room'; pts: ARPoint[]; label?: string }
 export interface CapturedOpening { kind: OpeningKind; p: ARPoint }
+/** A piece of furniture tapped on the floor; `yaw` is the camera heading in XR space (0 = −z, clockwise) when placed. */
+export interface CapturedItem { type: ItemType; p: ARPoint; yaw?: number }
 export interface WallSegment { a: ARPoint; b: ARPoint }
 
 export interface ARSessionHandle {
   session: XRSession
   end: () => Promise<void>
-  /** remove the last point of the polygon in progress (or last opening in opening stage) */
+  /** remove the last point of the polygon in progress (or last opening / item in those stages) */
   undo: () => void
   points: () => ARPoint[]
   polygons: () => CapturedPolygon[]
   openings: () => CapturedOpening[]
+  items: () => CapturedItem[]
+  /** compass bearing the XR forward axis points to, averaged over the session; null if the compass never reported */
+  northOffset: () => number | null
   stage: () => CaptureStage
-  setStage: (s: CaptureStage, opts?: { label?: string; openingKind?: OpeningKind }) => void
+  setStage: (s: CaptureStage, opts?: { label?: string; openingKind?: OpeningKind; itemType?: ItemType }) => void
   /** commit the polygon in progress (needs ≥ 3 points) */
   closePolygon: () => boolean
   /** Chrome 147+: ARCore room capture flow (plane-detection). false if unsupported. */
@@ -37,8 +44,10 @@ export interface ARSessionHandle {
 }
 
 export interface ARCallbacks {
-  onChange: (state: { stage: CaptureStage; points: ARPoint[]; polygons: CapturedPolygon[]; openings: CapturedOpening[]; walls: WallSegment[]; reticle: ARPoint | null }) => void
+  onChange: (state: { stage: CaptureStage; points: ARPoint[]; polygons: CapturedPolygon[]; openings: CapturedOpening[]; items: CapturedItem[]; walls: WallSegment[]; reticle: ARPoint | null }) => void
   onStatus: (msg: string) => void
+  /** latest compass heading of the camera (degrees); sampled against the XR camera yaw to find north */
+  getHeading?: () => number | null
   onTracking?: (hint: string | null) => void
   onFeatures?: (f: { planeDetection: boolean; depth: boolean; localFloor: boolean }) => void
   onEnd: () => void
@@ -101,29 +110,46 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
   let stage: CaptureStage = 'outline'
   let roomLabel: string | undefined
   let openingKind: OpeningKind = 'door'
+  let itemType: ItemType = 'bed'
   const cur: ARPoint[] = []
   const polygons: CapturedPolygon[] = []
   const openings: CapturedOpening[] = []
+  const items: CapturedItem[] = []
   const markers: THREE.Object3D[] = []
   const committed = new THREE.Group()
   scene.add(committed)
   let line: THREE.Line | null = null
   let lastReticle: ARPoint | null = null
 
-  const mat = { outline: new THREE.MeshBasicMaterial({ color: 0x2e9a76 }), room: new THREE.MeshBasicMaterial({ color: 0x3b82f6 }), opening: new THREE.MeshBasicMaterial({ color: 0xf59e0b }) }
+  const mat = { outline: new THREE.MeshBasicMaterial({ color: 0x2e9a76 }), room: new THREE.MeshBasicMaterial({ color: 0x3b82f6 }), opening: new THREE.MeshBasicMaterial({ color: 0xf59e0b }), item: new THREE.MeshBasicMaterial({ color: 0xa855f7 }) }
   const markerGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.01, 24)
   const lineMat = { outline: new THREE.LineBasicMaterial({ color: 0x2e9a76 }), room: new THREE.LineBasicMaterial({ color: 0x3b82f6 }) }
+  const isPolygonStage = (s: CaptureStage): s is 'outline' | 'room' => s === 'outline' || s === 'room'
 
-  const emit = () => cb.onChange({ stage, points: [...cur], polygons: polygons.map((p) => ({ ...p, pts: [...p.pts] })), openings: [...openings], walls: wallSegments(), reticle: lastReticle })
+  // ---- north: compare the compass (camera heading) with the XR camera yaw whenever both are known
+  const northSamples: { x: number; y: number }[] = []
+  const fwd = new THREE.Vector3()
+  const cameraYaw = () => {
+    fwd.set(0, 0, -1).transformDirection(renderer.xr.getCamera().matrixWorld)
+    return ((Math.atan2(fwd.x, -fwd.z) * 180) / Math.PI + 360) % 360
+  }
+  const northOffset = () => {
+    if (!northSamples.length) return null
+    const s = northSamples.reduce((a, v) => ({ x: a.x + v.x, y: a.y + v.y }), { x: 0, y: 0 })
+    return ((Math.atan2(s.y, s.x) * 180) / Math.PI + 360) % 360
+  }
+  let lastNorth = 0
+
+  const emit = () => cb.onChange({ stage, points: [...cur], polygons: polygons.map((p) => ({ ...p, pts: [...p.pts] })), openings: [...openings], items: [...items], walls: wallSegments(), reticle: lastReticle })
   const refreshLine = () => {
     if (line) { scene.remove(line); line.geometry.dispose(); line = null }
-    if (cur.length >= 2 && stage !== 'opening') {
+    if (cur.length >= 2 && isPolygonStage(stage)) {
       const g = new THREE.BufferGeometry().setFromPoints(cur.map((p) => new THREE.Vector3(p.x, p.y + 0.005, p.z)))
       line = new THREE.Line(g, lineMat[stage])
       scene.add(line)
     }
   }
-  const addMarker = (p: ARPoint, kind: 'outline' | 'room' | 'opening', into: THREE.Object3D = scene) => {
+  const addMarker = (p: ARPoint, kind: 'outline' | 'room' | 'opening' | 'item', into: THREE.Object3D = scene) => {
     const m = new THREE.Mesh(markerGeo, mat[kind])
     m.position.set(p.x, p.y, p.z)
     into.add(m)
@@ -144,6 +170,10 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
       openings.push({ kind: openingKind, p: pt })
       markers.push(addMarker(pt, 'opening', committed))
       cb.onStatus(`已放置${{ mainDoor: '大門', door: '房門', window: '窗' }[openingKind]}，共 ${openings.length} 個`)
+    } else if (stage === 'item') {
+      items.push({ type: itemType, p: pt, yaw: cameraYaw() })
+      markers.push(addMarker(pt, 'item', committed))
+      cb.onStatus(`已放置${ITEM_ZH[itemType]}，共 ${items.length} 件`)
     } else {
       cur.push(pt)
       markers.push(addMarker(pt, stage))
@@ -216,6 +246,15 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
     }
     if (t - lastEmit > 120) { lastEmit = t; emit() }
     renderer.render(scene, camera)
+    if (t - lastNorth > 400) {
+      lastNorth = t
+      const h = cb.getHeading?.()
+      if (h != null) {
+        const off = ((h - cameraYaw()) * Math.PI) / 180
+        northSamples.push({ x: Math.cos(off), y: Math.sin(off) })
+        if (northSamples.length > 90) northSamples.shift()
+      }
+    }
   })
 
   const cleanup = () => {
@@ -237,16 +276,19 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
     end: async () => { try { await session.end() } catch { cleanup() } },
     undo: () => {
       if (stage === 'opening') { openings.pop(); const m = markers.pop(); m?.parent?.remove(m) }
+      else if (stage === 'item') { items.pop(); const m = markers.pop(); m?.parent?.remove(m) }
       else { cur.pop(); const m = markers.pop(); m?.parent?.remove(m); refreshLine() }
       emit()
     },
     points: () => [...cur],
     polygons: () => polygons.map((p) => ({ ...p, pts: [...p.pts] })),
     openings: () => [...openings],
+    items: () => [...items],
+    northOffset,
     stage: () => stage,
-    setStage: (s, opts) => { stage = s; roomLabel = opts?.label; if (opts?.openingKind) openingKind = opts.openingKind; clearCurrent(); markers.length = 0; emit() },
+    setStage: (s, opts) => { stage = s; roomLabel = opts?.label; if (opts?.openingKind) openingKind = opts.openingKind; if (opts?.itemType) itemType = opts.itemType; clearCurrent(); markers.length = 0; emit() },
     closePolygon: () => {
-      if (cur.length < 3 || stage === 'opening') return false
+      if (cur.length < 3 || !isPolygonStage(stage)) return false
       polygons.push({ stage, pts: [...cur], label: roomLabel })
       // keep committed geometry visible
       const g = new THREE.BufferGeometry().setFromPoints([...cur, cur[0]!].map((p) => new THREE.Vector3(p.x, p.y + 0.005, p.z)))
@@ -265,7 +307,7 @@ export async function startARSession(overlayRoot: HTMLElement, cb: ARCallbacks):
     floorOutline: () => (bestFloor && bestFloor.pts.length >= 3 ? bestFloor.pts.map((p) => ({ ...p })) : null),
     wallSegments,
     useDetectedFloor: () => {
-      if (!bestFloor || bestFloor.pts.length < 3 || stage === 'opening') return false
+      if (!bestFloor || bestFloor.pts.length < 3 || !isPolygonStage(stage)) return false
       clearCurrent()
       for (const p of simplify(bestFloor.pts, 0.15)) { cur.push({ ...p }); markers.push(addMarker(p, stage)) }
       refreshLine(); emit()

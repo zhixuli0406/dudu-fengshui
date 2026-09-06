@@ -25,7 +25,7 @@ export function PlanWizardPage() {
 
   // ---- derived plan from wizard state (shared with the guided walk-through)
   const derived = useMemo(() => deriveWizardPlan(w, house.facingBearing), [w, house.facingBearing])
-  const { cells, rooms, mainDoor, items, plan } = derived
+  const { cells, rooms, entry: mainDoor, items, plan } = derived
 
   const [brush, setBrush] = useState<RoomType>('living')
   const go = (n: number) => setWizard({ step: Math.max(0, Math.min(STEPS.length - 1, n)) })

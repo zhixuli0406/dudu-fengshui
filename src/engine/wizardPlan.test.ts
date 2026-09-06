@@ -8,7 +8,7 @@ const base: WizardInput = { widthM: 10, depthM: 8, shape: 'rect', corner: 'tr', 
 describe('deriveWizardPlan', () => {
   it('puts the main door on the bottom wall and orients the plan so it faces the compass reading', () => {
     const d = deriveWizardPlan(base, 50)
-    expect(d.mainDoor.y + d.mainDoor.h / 2).toBeCloseTo(800, 0)
+    expect(d.entry.y + d.entry.h / 2).toBeCloseTo(800, 0)
     expect(d.plan.northOffset).toBe(230) // top of the sketch points to the sitting direction
     expect(d.rooms).toHaveLength(0)
     expect(d.items).toHaveLength(1)
@@ -50,5 +50,16 @@ describe('wall bearings from the doorway', () => {
     expect(wallDirectionZh('bottom', ne)).toBe('東北')
     expect(wallDirectionZh('right', ne)).toBe('西北')
     expect(wallDirectionZh('left', ne)).toBe('東南')
+  })
+})
+
+describe('upper floors', () => {
+  it('put the stairs where the door would be and inherit the north offset', () => {
+    const d = deriveWizardPlan({ ...base, paint: { '0,0': 'bedroom' } }, 50, { upper: true, northOffset: 230, name: '2F', level: 1 })
+    expect(d.entry.type).toBe('stairs')
+    expect(d.items.some((i) => i.type === 'mainDoor')).toBe(false)
+    expect(d.plan.northOffset).toBe(230)
+    expect(d.plan.name).toBe('2F')
+    expect(d.plan.level).toBe(1)
   })
 })

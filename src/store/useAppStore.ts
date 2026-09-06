@@ -7,6 +7,7 @@ import type { Corner, Shape, Wall } from '../engine/wizard'
 import type { LiteRoom } from '../engine/lite'
 import { synthesizePlan } from '../engine/lite'
 import type { StepId } from '../guide/script'
+import type { HomeType } from '../engine/homeTypes'
 
 export interface Settings {
   /** apply magnetic declination to compass readings */
@@ -34,6 +35,10 @@ export interface HouseState {
   replacementMode: 'auto' | 'never'
   periodYear: number
   lunarMonth?: number
+  /** 住家類型（公寓大樓的一戶／樓中樓／透天）；決定要建幾層 */
+  homeType?: HomeType
+  /** 這一戶佔幾層（透天 2–5、樓中樓 2、公寓 1） */
+  floorCount?: number
 }
 
 export interface WizardState {
@@ -59,6 +64,8 @@ export interface LiteState {
   /** room type being asked about / the lite room it created */
   pendingType?: RoomType
   pendingId?: string
+  /** which floor (index into `floors`) the guide is building / judging */
+  floorIdx?: number
   /** the arrival scene plays once */
   introSeen?: boolean
 }
