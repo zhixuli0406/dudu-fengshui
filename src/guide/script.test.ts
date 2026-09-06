@@ -1,71 +1,66 @@
 import { describe, expect, it } from 'vitest'
-import { BUILT_CHOICES, firstStep, nextStep, pendingRoomType, prevStep, progressOf, roomMenu, SPINE, type GuideCtx, type StepId } from './script'
+import { BUILT_CHOICES, firstStep, isStepId, nextStep, prevStep, progressOf, roomStops, SPINE, type GuideCtx, type StepId } from './script'
 import { periodOfYear } from '../engine/xuankong'
+import type { Room } from '../engine/floorplan'
 
 const base: GuideCtx = { introSeen: false, hasFacing: false, persons: 0, rooms: [] }
+const sq = (x: number, y: number) => [{ x, y }, { x: x + 100, y }, { x: x + 100, y: y + 100 }, { x, y: y + 100 }]
+const rooms: Room[] = [{ id: 'k', type: 'kitchen', polygon: sq(0, 0) }, { id: 'l', type: 'living', polygon: sq(200, 0) }, { id: 'm', type: 'master', polygon: sq(0, 200) }]
 
 describe('guide script', () => {
   it('starts with the intro scene once, then goes straight to the door', () => {
     expect(firstStep(base)).toBe('intro')
     expect(firstStep({ ...base, introSeen: true })).toBe('door')
     expect(prevStep('door', { ...base, introSeen: true })).toBeNull()
+    expect(isStepId('roomWhere')).toBe(false)
+    expect(isStepId('paint')).toBe(true)
   })
 
-  it('walks the spine door → owner → more → built → reveal', () => {
+  it('walks the spine door → owner → more → built → reveal → size → paint', () => {
     let id: StepId = 'intro'
     const seen: StepId[] = []
-    for (let i = 0; i < 5; i++) { id = nextStep(id, base); seen.push(id) }
-    expect(seen).toEqual(['door', 'owner', 'more', 'built', 'reveal'])
+    for (let i = 0; i < 7; i++) { id = nextStep(id, base).id; seen.push(id) }
+    expect(seen).toEqual(['door', 'owner', 'more', 'built', 'reveal', 'size', 'paint'])
   })
 
-  it('asks about the master bedroom first, then its bed head, then the verdict', () => {
-    const ctx = { ...base, hasFacing: true, persons: 1 }
-    expect(pendingRoomType(ctx)).toBe('master')
-    expect(nextStep('reveal', ctx)).toBe('roomWhere')
-    const withPending = { ...ctx, pendingType: 'master' as const, pendingId: 'r1' }
-    expect(nextStep('roomWhere', withPending)).toBe('roomFacing')
-    expect(nextStep('roomFacing', withPending)).toBe('roomVerdict')
-    expect(nextStep('roomVerdict', withPending)).toBe('roomType')
+  it('orders rooms master first and knows which ones have a wall question', () => {
+    const stops = roomStops(rooms)
+    expect(stops.map((s) => s.id)).toEqual(['m', 'k', 'l'])
+    expect(stops.map((s) => s.askWall)).toEqual([true, true, true])
+    expect(roomStops([{ id: 'e', type: 'entry', polygon: sq(0, 0) }])[0]!.askWall).toBe(false)
   })
 
-  it('skips the facing question for rooms without a key facing (bathroom, living)', () => {
-    const ctx = { ...base, pendingType: 'bathroom' as const, pendingId: 'r2', rooms: [{ id: 'r1', type: 'master' as const, palace: 'kan' as const }] }
-    expect(nextStep('roomWhere', ctx)).toBe('roomVerdict')
-    expect(prevStep('roomVerdict', ctx)).toBe('roomWhere')
+  it('after painting, asks the wall then gives the verdict for each room in order, then sums up', () => {
+    const ctx: GuideCtx = { ...base, rooms: [{ id: 'm', askWall: true }, { id: 'e', askWall: false }] }
+    const a = nextStep('paint', ctx)
+    expect(a).toEqual({ id: 'furniture', pendingId: 'm' })
+    const b = nextStep('furniture', { ...ctx, pendingId: 'm' })
+    expect(b).toEqual({ id: 'roomVerdict', pendingId: 'm' })
+    const c = nextStep('roomVerdict', { ...ctx, pendingId: 'm' })
+    expect(c).toEqual({ id: 'roomVerdict', pendingId: 'e' })
+    expect(nextStep('roomVerdict', { ...ctx, pendingId: 'e' })).toEqual({ id: 'summary' })
+    expect(nextStep('paint', { ...base, rooms: [] })).toEqual({ id: 'summary' })
   })
 
-  it('loops on roomType until the user stops', () => {
-    const rooms = [{ id: 'r1', type: 'master' as const, palace: 'kan' as const }]
-    expect(nextStep('roomType', { ...base, rooms, pendingType: 'kitchen' })).toBe('roomWhere')
-    expect(nextStep('roomType', { ...base, rooms })).toBe('summary')
-    expect(nextStep('reveal', { ...base, rooms })).toBe('roomType')
-    expect(pendingRoomType({ ...base, rooms })).toBeUndefined()
-  })
-
-  it('back arrow retraces every forward edge', () => {
-    const rooms = [{ id: 'r1', type: 'master' as const, palace: 'kan' as const }]
-    const ctx: GuideCtx = { ...base, rooms, pendingType: 'master', pendingId: 'r1' }
-    for (const [from, to] of [['owner', 'door'], ['more', 'owner'], ['built', 'more'], ['reveal', 'built'], ['roomFacing', 'roomWhere'], ['roomVerdict', 'roomFacing'], ['roomType', 'roomVerdict'], ['summary', 'roomType']] as [StepId, StepId][]) {
-      expect(prevStep(from, ctx)).toBe(to)
-    }
-    expect(prevStep('roomWhere', { ...base, rooms: [] })).toBe('reveal')
-    expect(prevStep('roomType', { ...base, rooms: [] })).toBe('reveal')
+  it('back arrow retraces the room loop', () => {
+    const ctx: GuideCtx = { ...base, rooms: [{ id: 'm', askWall: true }, { id: 'e', askWall: false }] }
+    expect(prevStep('furniture', { ...ctx, pendingId: 'm' })).toEqual({ id: 'paint' })
+    expect(prevStep('roomVerdict', { ...ctx, pendingId: 'm' })).toEqual({ id: 'furniture', pendingId: 'm' })
+    expect(prevStep('roomVerdict', { ...ctx, pendingId: 'e' })).toEqual({ id: 'roomVerdict', pendingId: 'm' })
+    expect(prevStep('summary', ctx)).toEqual({ id: 'roomVerdict', pendingId: 'e' })
+    expect(prevStep('summary', { ...base, rooms: [] })).toEqual({ id: 'paint' })
+    expect(prevStep('paint', ctx)).toEqual({ id: 'size' })
+    expect(prevStep('size', ctx)).toEqual({ id: 'reveal' })
   })
 
   it('progress counter stays within the spine', () => {
     for (const id of SPINE) { const p = progressOf(id); expect(p.n).toBeGreaterThan(0); expect(p.n).toBeLessThanOrEqual(p.total) }
     expect(progressOf('intro').n).toBe(0)
+    expect(progressOf('roomVerdict').n).toBe(SPINE.length)
     expect(progressOf('summary').n).toBe(SPINE.length)
   })
 
   it('build-year buckets map to distinct periods', () => {
     expect(BUILT_CHOICES.map((c) => periodOfYear(c.year))).toEqual([9, 8, 7, 6])
-  })
-
-  it('room menu offers each type once but allows extra bedrooms', () => {
-    const menu = roomMenu([{ id: 'a', type: 'master', palace: 'kan' }, { id: 'b', type: 'bedroom', palace: 'li' }])
-    expect(menu).not.toContain('master')
-    expect(menu).toContain('bedroom')
-    expect(menu).toContain('kitchen')
   })
 })

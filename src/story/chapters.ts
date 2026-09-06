@@ -1,6 +1,6 @@
 import { PALACES, type Trigram } from '../engine/bagua'
 import { groupZh, WANDERING_STARS } from '../engine/bazhai'
-import { ROOM_ZH, type FloorPlan, type Room } from '../engine/floorplan'
+import { ITEM_ZH, ROOM_ZH, type FloorPlan, type Room } from '../engine/floorplan'
 import { polygonCentroid } from '../engine/geometry'
 import { NINE_STARS, RATING_ZH } from '../engine/stars'
 import { palaceLabel } from '../engine/annual'
@@ -88,11 +88,16 @@ export function buildChapters(report: Report, plan: FloorPlan, masterName = '嘟
     for (const it of roomItems) {
       const bad = it.perPerson.filter((p) => p.verdict === 'bad')
       const good = it.perPerson.filter((p) => p.verdict === 'good')
-      if (bad.length) paras.push(`${it.label.replace(/（.+）/, '')}${it.facingPalace ? `朝${PALACES[it.facingPalace].direction}` : `在${PALACES[it.palace].direction}`}，對${bad.map((b) => b.name).join('、')}是「${WANDERING_STARS[bad[0]!.star].zh}」，${it.itemType === 'bed' ? '睡久了不安穩。' : it.itemType === 'desk' ? '坐久了不專心。' : '不太合。'}`)
-      else if (good.length) paras.push(`${it.label.replace(/（.+）/, '')}的方向對${good.map((g) => g.name).join('、')}是吉方，這一點不用改。`)
+      const what = it.label.replace(/（.+）/, '').replace(/朝向$/, '')
+      if (bad.length) paras.push(`${what}${it.facingPalace ? `朝${PALACES[it.facingPalace].direction}` : `在${PALACES[it.palace].direction}`}，對${bad.map((b) => b.name).join('、')}是「${WANDERING_STARS[bad[0]!.star].zh}」，${it.itemType === 'bed' ? '睡久了不安穩。' : it.itemType === 'desk' ? '坐久了不專心。' : '不太合。'}`)
+      else if (good.length) paras.push(`${what}的方向對${good.map((g) => g.name).join('、')}是吉方，這一點不用改。`)
     }
     for (const f of roomFindings.slice(0, 4)) paras.push(`${f.explanation}`)
-    if (!roomItems.length && !roomFindings.length) paras.push(`這間房沒放家具，我看不出擺設。回去放上${r.type === 'kitchen' ? '爐灶' : r.type === 'bathroom' ? '馬桶' : r.type === 'study' ? '書桌' : ['master', 'bedroom', 'kids'].includes(r.type) ? '床' : '沙發'}，我再仔細看。`)
+    if (!roomItems.length && !roomFindings.length) {
+      const placed = plan.items.filter((i) => i.roomId === r.id && i.type !== 'door' && i.type !== 'window')
+      if (placed.length) paras.push(`${placed.map((i) => ITEM_ZH[i.type]).join('、')}擺得沒問題，這間我沒有意見。`)
+      else paras.push(`這間房沒放家具，我看不出擺設。回去放上${r.type === 'kitchen' ? '爐灶' : r.type === 'bathroom' ? '馬桶' : r.type === 'study' ? '書桌' : ['master', 'bedroom', 'kids'].includes(r.type) ? '床' : '沙發'}，我再仔細看。`)
+    }
     const todos = actionsFor(actions, (a) => (a.where ? a.where.includes(name) : false) || roomFindings.some((f) => a.id.startsWith(f.ruleId)) || roomItems.some((it) => a.id.includes(it.itemId)))
     chapters.push({ id: `room_${r.id}`, label: name, title: `走進${name}`, cue: { kind: 'room', roomId: r.id }, bubble: roomBubble(r.type, roomFindings.length, roomItems.some((it) => it.perPerson.some((p) => p.verdict === 'bad'))), paragraphs: paras, todos, highlight: [pal], roomId: r.id })
   }

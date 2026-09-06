@@ -71,7 +71,7 @@ src/store/         zustand + localStorage 持久化
 
 ## 師傅來看房（/start，lite 模式）
 
-`guide/script.ts` 是純狀態機：`StepId`（intro／door／owner／more／built／reveal／roomWhere／roomFacing／roomVerdict／roomType／summary）、`nextStep`／`prevStep`（房間迴圈：roomType 選了房型 → roomWhere → 有關鍵家具的房型再問 roomFacing → roomVerdict → 回到 roomType）、`progressOf`（固定七格脊椎）、屋齡分桶 `BUILT_CHOICES`。進度與待問房間（`stepId`、`pendingType`、`pendingId`、`introSeen`）存在 store 的 `lite`，重整不會掉。`guide/Scene.tsx` 是對話節拍（`useTypewriter` 逐字、點一下加速、講完才出選項、選項可帶一句回話）；`pages/StartPage.tsx` 只負責把每個 step 畫出來。文案原則：一題一畫面、師傅口吻、每題一行「為什麼要問」、每題有台階、中途揭曉（不把價值留到最後）。
+`guide/script.ts` 是純狀態機：`StepId`（intro／door／owner／more／built／reveal／size／paint／furniture／roomVerdict／summary）、`nextStep`／`prevStep` 回傳 `Move { id, pendingId }`（房間迴圈：paint 之後依 `roomStops` 的順序（主臥→臥室→小孩房→廚房→書房→廁所→客廳…）每間房先問 furniture（有關鍵家具才問）再給 roomVerdict，走完進 summary）、`progressOf`（固定七格脊椎）、屋齡分桶 `BUILT_CHOICES`。進度與目前房間（`stepId`、`pendingId`、`introSeen`）存在 store 的 `lite`，重整不會掉。建圖沿用精靈的 `wizard` 狀態，`engine/wizardPlan.ts` 的 `deriveWizardPlan(wizard, facingBearing)` 把尺寸、塗格、大門位置推成正式 `FloorPlan`（大門固定在草圖下牆，`northOffset` 依羅盤朝向），塗好即 `setFloors`；家具靠牆用 `placeAgainstWall` 直接寫進 store 的 plan（所以使用者自己畫的圖也能走同一段）。方位選擇一律用羅盤（`guide/DoorCompass.tsx`）或草圖上的牆，不用九宮格；揭曉頁的財位圖是 `guide/PalaceRose.tsx` 羅盤玫瑰。`guide/Scene.tsx` 是對話節拍（`useTypewriter` 逐字、點一下加速、講完才出選項、選項可帶一句回話）；`pages/StartPage.tsx` 只負責把每個 step 畫出來。文案原則：一題一畫面、師傅口吻、每題一行「為什麼要問」、每題有台階、中途揭曉（不把價值留到最後）。
 
 
 `engine/lite.ts`：`LiteRoom { type, palace, facing? }` 只記房間在哪一宮與關鍵家具朝向；`synthesizePlan(facing, rooms)` 合成 9×9 m 北上示意屋（大門在朝向那一側、房間佔對應宮位的 3×3 格、家具置中並依 facing 轉向，`plan.synthetic = true`）。`store.resolveAnalysisPlan()` 在沒有真實平面圖時回傳示意屋；`buildReport` 對 synthetic 跳過形勢規則並改用三維度加權。

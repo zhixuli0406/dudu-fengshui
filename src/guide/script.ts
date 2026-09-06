@@ -1,37 +1,44 @@
-import { FACING_QUESTION, type LiteRoom } from '../engine/lite'
-import type { RoomType } from '../engine/floorplan'
+import type { Room, RoomType } from '../engine/floorplan'
+import { keyItemFor } from '../engine/wizard'
 
 /**
  * The guided walk-through ("師傅來看房"): one question per screen in the master's voice, a short
- * scene before, a reveal in the middle and a wrap-up at the end. This module is the pure state
- * machine; `pages/StartPage.tsx` renders it.
+ * scene before, a reveal in the middle, then the house is sketched room by room and each room
+ * gets its verdict. This module is the pure state machine; `pages/StartPage.tsx` renders it.
  */
 export type StepId =
   | 'intro' // scene: the master arrives at the door
-  | 'door' // which way the main door faces
+  | 'door' // which way the main door faces (compass)
   | 'owner' // who runs the household (first person)
   | 'more' // anyone else to include
   | 'built' // roughly when the house was built (period)
   | 'reveal' // scene: house gua, wealth / study positions, owner's fit
-  | 'roomWhere' // which sector a room is in
-  | 'roomFacing' // bed head / stove mouth / desk facing
+  | 'size' // how big the house is, seen from the doorway
+  | 'paint' // paint rooms onto the sketch
+  | 'furniture' // which wall the key piece of one room is against
   | 'roomVerdict' // scene: what the master says about that room
-  | 'roomType' // pick the next room, or stop
   | 'summary' // scene: score, top to-dos, exits
+
+export const STEP_IDS: StepId[] = ['intro', 'door', 'owner', 'more', 'built', 'reveal', 'size', 'paint', 'furniture', 'roomVerdict', 'summary']
+export function isStepId(x: unknown): x is StepId { return typeof x === 'string' && (STEP_IDS as string[]).includes(x) }
+
+/** A room in the order the master walks them, and whether it has a key piece of furniture to ask about. */
+export interface RoomStop { id: string; askWall: boolean }
 
 export interface GuideCtx {
   introSeen: boolean
   hasFacing: boolean
   persons: number
-  rooms: LiteRoom[]
-  /** room type currently being asked about (chosen on `roomType`, or master bedroom the first time) */
-  pendingType?: RoomType
-  /** id of the lite room created on `roomWhere`, so `roomFacing` / `roomVerdict` know which one */
+  rooms: RoomStop[]
+  /** the room currently being asked about / judged */
   pendingId?: string
 }
 
+/** Where to go next: a step and, for room steps, which room. */
+export interface Move { id: StepId; pendingId?: string }
+
 /** Fixed spine used for the "n / N" counter; the room loop repeats at the tail. */
-export const SPINE: StepId[] = ['door', 'owner', 'more', 'built', 'roomWhere', 'roomFacing', 'roomType']
+export const SPINE: StepId[] = ['door', 'owner', 'more', 'built', 'size', 'paint', 'furniture']
 
 export function progressOf(id: StepId): { n: number; total: number } {
   const total = SPINE.length
@@ -39,7 +46,6 @@ export function progressOf(id: StepId): { n: number; total: number } {
   if (i >= 0) return { n: i + 1, total }
   if (id === 'intro') return { n: 0, total }
   if (id === 'reveal') return { n: 4, total }
-  if (id === 'roomVerdict') return { n: 6, total }
   return { n: total, total }
 }
 
@@ -47,46 +53,52 @@ export function firstStep(ctx: GuideCtx): StepId {
   return ctx.introSeen ? 'door' : 'intro'
 }
 
-export function hasFacingQuestion(type: RoomType): boolean {
-  return Boolean(FACING_QUESTION[type])
+/** The order the master walks the rooms: sleeping first, then fire, then the rest. */
+export const ROOM_ORDER: RoomType[] = ['master', 'bedroom', 'kids', 'kitchen', 'study', 'bathroom', 'living', 'altar', 'dining', 'entry', 'balcony', 'storage', 'corridor', 'other', 'driveway', 'void']
+
+export function roomStops(rooms: Room[]): RoomStop[] {
+  return [...rooms].filter((r) => r.polygon.length >= 3).sort((a, b) => ROOM_ORDER.indexOf(a.type) - ROOM_ORDER.indexOf(b.type)).map((r) => ({ id: r.id, askWall: keyItemFor(r.type) !== null }))
 }
 
-/** The room the next `roomWhere` should ask about: what was picked, or the master bedroom to start. */
-export function pendingRoomType(ctx: GuideCtx): RoomType | undefined {
-  if (ctx.pendingType) return ctx.pendingType
-  return ctx.rooms.length === 0 ? 'master' : undefined
-}
+const stepFor = (r: RoomStop): Move => ({ id: r.askWall ? 'furniture' : 'roomVerdict', pendingId: r.id })
+const indexOf = (ctx: GuideCtx) => ctx.rooms.findIndex((r) => r.id === ctx.pendingId)
 
-export function nextStep(id: StepId, ctx: GuideCtx): StepId {
+export function nextStep(id: StepId, ctx: GuideCtx): Move {
   switch (id) {
-    case 'intro': return 'door'
-    case 'door': return 'owner'
-    case 'owner': return 'more'
-    case 'more': return 'built'
-    case 'built': return 'reveal'
-    case 'reveal': return pendingRoomType(ctx) ? 'roomWhere' : 'roomType'
-    case 'roomWhere': return ctx.pendingType && hasFacingQuestion(ctx.pendingType) ? 'roomFacing' : 'roomVerdict'
-    case 'roomFacing': return 'roomVerdict'
-    case 'roomVerdict': return 'roomType'
-    case 'roomType': return ctx.pendingType ? 'roomWhere' : 'summary'
-    case 'summary': return 'summary'
+    case 'intro': return { id: 'door' }
+    case 'door': return { id: 'owner' }
+    case 'owner': return { id: 'more' }
+    case 'more': return { id: 'built' }
+    case 'built': return { id: 'reveal' }
+    case 'reveal': return { id: 'size' }
+    case 'size': return { id: 'paint' }
+    case 'paint': return ctx.rooms[0] ? stepFor(ctx.rooms[0]) : { id: 'summary' }
+    case 'furniture': return { id: 'roomVerdict', pendingId: ctx.pendingId }
+    case 'roomVerdict': { const n = ctx.rooms[indexOf(ctx) + 1]; return n ? stepFor(n) : { id: 'summary' } }
+    case 'summary': return { id: 'summary' }
   }
 }
 
 /** Where the back arrow goes; `null` means leave the guide. */
-export function prevStep(id: StepId, ctx: GuideCtx): StepId | null {
+export function prevStep(id: StepId, ctx: GuideCtx): Move | null {
   switch (id) {
     case 'intro': return null
-    case 'door': return ctx.introSeen ? null : 'intro'
-    case 'owner': return 'door'
-    case 'more': return 'owner'
-    case 'built': return 'more'
-    case 'reveal': return 'built'
-    case 'roomWhere': return ctx.rooms.length ? 'roomType' : 'reveal'
-    case 'roomFacing': return 'roomWhere'
-    case 'roomVerdict': return ctx.pendingType && hasFacingQuestion(ctx.pendingType) ? 'roomFacing' : 'roomWhere'
-    case 'roomType': return ctx.rooms.length ? 'roomVerdict' : 'reveal'
-    case 'summary': return 'roomType'
+    case 'door': return ctx.introSeen ? null : { id: 'intro' }
+    case 'owner': return { id: 'door' }
+    case 'more': return { id: 'owner' }
+    case 'built': return { id: 'more' }
+    case 'reveal': return { id: 'built' }
+    case 'size': return { id: 'reveal' }
+    case 'paint': return { id: 'size' }
+    case 'furniture': { const p = ctx.rooms[indexOf(ctx) - 1]; return p ? { id: 'roomVerdict', pendingId: p.id } : { id: 'paint' } }
+    case 'roomVerdict': {
+      const i = indexOf(ctx)
+      const r = ctx.rooms[i]
+      if (r?.askWall) return { id: 'furniture', pendingId: r.id }
+      const p = ctx.rooms[i - 1]
+      return p ? { id: 'roomVerdict', pendingId: p.id } : { id: 'paint' }
+    }
+    case 'summary': { const last = ctx.rooms[ctx.rooms.length - 1]; return last ? { id: 'roomVerdict', pendingId: last.id } : { id: 'paint' } }
   }
 }
 
@@ -98,21 +110,5 @@ export const BUILT_CHOICES: ReadonlyArray<{ label: string; year: number }> = [
   { label: '更早', year: 1970 },
 ]
 
-/** Rooms offered on `roomType`, in the order the master would walk them. */
-export const ROOM_MENU: RoomType[] = ['master', 'bedroom', 'kids', 'kitchen', 'study', 'bathroom', 'living', 'altar']
-
-/** Rooms still worth asking about: each type once, except extra bedrooms. */
-export function roomMenu(rooms: LiteRoom[]): RoomType[] {
-  const taken = new Set(rooms.map((r) => r.type))
-  return ROOM_MENU.filter((t) => t === 'bedroom' || !taken.has(t))
-}
-
-/** One line under the facing question: why the master cares. */
-export const FACING_WHY: Partial<Record<RoomType, string>> = {
-  master: '床頭的方向，影響睡的人最深。',
-  bedroom: '床頭的方向，影響睡的人最深。',
-  kids: '小孩睡得安穩，比什麼都要緊。',
-  kitchen: '灶口朝哪，管一家人的食祿。',
-  study: '坐向對了，書才讀得進去。',
-  altar: '神位要朝吉方，背後要靠實牆。',
-}
+/** Room types offered as brushes when painting the sketch, in the order people usually think of them. */
+export const BRUSHES: RoomType[] = ['living', 'master', 'bedroom', 'kids', 'kitchen', 'dining', 'bathroom', 'study', 'entry', 'balcony', 'altar', 'storage']

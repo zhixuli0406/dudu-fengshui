@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { CompassDial } from '../components/CompassDial'
-import { DirectionPad } from '../components/DirectionPad'
 import { useCompass } from '../hooks/useCompass'
 import { useAppStore } from '../store/useAppStore'
 import { mountainOf } from '../engine/mountains24'
 import { palaceOfBearing } from '../engine/direction'
-import { PALACES, type Trigram } from '../engine/bagua'
+import { PALACES, TRIGRAMS_CLOCKWISE, type Trigram } from '../engine/bagua'
 import { Escape, choiceCls } from './Scene'
 import { cn } from '../lib/utils'
 
@@ -28,7 +27,9 @@ export function DoorCompass({ current, onConfirm, onKeep }: { current: number | 
       <div>
         {noSensor && <p className="mb-3 text-sm text-zinc-300">{compass.status === 'denied' ? '感測器權限被拒絕，先用手選。iOS 可到「設定」的 Safari 開啟「動作與方向存取」。' : '這台裝置量不到方向，先用手選；之後用手機再量會更準。'}</p>}
         <p className="mb-2 text-sm text-zinc-300">站在大門裡面、面朝屋外，你正對的是哪一邊？</p>
-        <DirectionPad value={current != null ? palaceOfBearing(current) : null} onChange={(t: Trigram) => onConfirm(PALACES[t].bearing, 'manual')} center={<span className="text-xs text-zinc-500">上方為北</span>} />
+        <div className="grid grid-cols-4 gap-2">
+          {TRIGRAMS_CLOCKWISE.map((t: Trigram) => <button key={t} className={choiceCls(current != null && palaceOfBearing(current) === t)} onClick={() => onConfirm(PALACES[t].bearing, 'manual')}>{PALACES[t].direction}</button>)}
+        </div>
         {!noSensor && <Escape label="改回用羅盤量" onPick={() => setManual(false)} />}
       </div>
     )

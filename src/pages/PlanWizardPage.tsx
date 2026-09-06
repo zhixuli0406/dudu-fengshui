@@ -5,9 +5,10 @@ import { Page, PageHeader } from '../components/AppShell'
 import { PlanPreview, ROOM_FILL_CSS } from '../components/PlanPreview'
 import { Badge, Button, Field, Input, NativeSelect, Segmented } from '../components/mds'
 import { useAppStore, type WizardState } from '../store/useAppStore'
-import { ROOM_ZH, emptyPlan, newId, type FloorPlan, type Item, type Room, type RoomType } from '../engine/floorplan'
-import { cellsToRooms, doorOnWall, gridCells, keyItemFor, outlineFromDims, placeAgainstWall, roomDoorTowards, WALL_ZH, type Wall } from '../engine/wizard'
-import { polygonCentroid } from '../engine/geometry'
+import { ROOM_ZH, type RoomType } from '../engine/floorplan'
+import { keyItemFor, WALL_ZH, type Wall } from '../engine/wizard'
+import { deriveWizardPlan, finalizeWizardPlan } from '../engine/wizardPlan'
+import { NorthArrow } from '../components/NorthArrow'
 import { mountainOf } from '../engine/mountains24'
 import { PALACES, TRIGRAMS_CLOCKWISE } from '../engine/bagua'
 import { cn } from '../lib/utils'
@@ -22,41 +23,13 @@ export function PlanWizardPage() {
   const w = wizard
   const step = w.step
 
-  // ---- derived plan from wizard state
-  const outline = useMemo(() => outlineFromDims(w.widthM, w.depthM, w.shape, w.corner, w.notchWM, w.notchDM), [w.widthM, w.depthM, w.shape, w.corner, w.notchWM, w.notchDM])
-  const cells = useMemo(() => gridCells(outline, w.cols, w.rows), [outline, w.cols, w.rows])
-  const rooms = useMemo<Room[]>(() => cellsToRooms(cells, w.paint).map((r, i) => ({ ...r, id: `wz_r${i}` })), [cells, w.paint])
-  const mainDoor = useMemo<Item>(() => ({ id: 'wz_door', ...doorOnWall(outline, w.doorWall, w.doorT) }), [outline, w.doorWall, w.doorT])
-  const northOffset = ((house.facingBearing - (mainDoor.facing + 180)) % 360 + 360) % 360
-  const items = useMemo<Item[]>(() => {
-    const out: Item[] = [mainDoor]
-    const center = polygonCentroid(outline)
-    for (const r of rooms) {
-      const wall = w.walls[r.id]
-      const key = keyItemFor(r.type)
-      if (key && wall) out.push({ id: `wz_i_${r.id}`, ...placeAgainstWall(r, key.item, wall) })
-      if (['master', 'bedroom', 'kids', 'study', 'bathroom', 'kitchen', 'storage', 'altar'].includes(r.type)) out.push({ id: `wz_d_${r.id}`, ...roomDoorTowards(r, center) })
-    }
-    return out
-  }, [rooms, w.walls, mainDoor, outline])
-  const plan: FloorPlan = useMemo(() => ({ ...emptyPlan('1F', 0), outline, rooms, items, northOffset, gridCm: 50 }), [outline, rooms, items, northOffset])
+  // ---- derived plan from wizard state (shared with the guided walk-through)
+  const derived = useMemo(() => deriveWizardPlan(w, house.facingBearing), [w, house.facingBearing])
+  const { cells, rooms, mainDoor, items, plan } = derived
 
   const [brush, setBrush] = useState<RoomType>('living')
   const go = (n: number) => setWizard({ step: Math.max(0, Math.min(STEPS.length - 1, n)) })
-  const finish = (to: string) => {
-    const idMap = new Map(rooms.map((r) => [r.id, newId('r')] as const))
-    const final: FloorPlan = {
-      ...plan,
-      rooms: rooms.map((r) => ({ ...r, id: idMap.get(r.id)! })),
-      items: items.map((i) => {
-        const byWizard = i.roomId ? idMap.get(i.roomId) : undefined
-        const byPos = rooms.find((rr) => inPoly({ x: i.x + i.w / 2, y: i.y + i.h / 2 }, rr.polygon))
-        return { ...i, id: newId('i'), roomId: byWizard ?? (byPos ? idMap.get(byPos.id) : undefined) }
-      }),
-    }
-    setFloors([final])
-    nav(to)
-  }
+  const finish = (to: string) => { setFloors([finalizeWizardPlan(derived)]); nav(to) }
 
   return (
     <>
@@ -210,19 +183,3 @@ export function PlanWizardPage() {
   )
 }
 
-function NorthArrow({ plan }: { plan: FloorPlan }) {
-  const c = polygonCentroid(plan.outline)
-  const r = Math.max(...plan.outline.map((p) => Math.hypot(p.x - c.x, p.y - c.y))) * 0.9
-  const a = ((-plan.northOffset - 90) * Math.PI) / 180
-  const x = c.x + r * Math.cos(a), y = c.y + r * Math.sin(a)
-  return <g pointerEvents="none"><line x1={c.x} y1={c.y} x2={x} y2={y} stroke="var(--destructive)" strokeWidth={r / 60} strokeOpacity={0.7} /><text x={x} y={y - r / 20} textAnchor="middle" fontSize={r / 8} fill="var(--destructive)">N</text></g>
-}
-
-function inPoly(p: { x: number; y: number }, poly: { x: number; y: number }[]): boolean {
-  let inside = false
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i]!, b = poly[j]!
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside
-  }
-  return inside
-}
