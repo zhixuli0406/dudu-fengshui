@@ -6,6 +6,7 @@ import type { RoomType } from '../engine/floorplan'
 import type { Corner, Shape, Wall } from '../engine/wizard'
 import type { LiteRoom } from '../engine/lite'
 import { synthesizePlan } from '../engine/lite'
+import type { StepId } from '../guide/script'
 
 export interface Settings {
   /** apply magnetic declination to compass readings */
@@ -51,16 +52,29 @@ export interface WizardState {
   walls: Record<string, Wall | undefined>
 }
 
+export interface LiteState {
+  rooms: LiteRoom[]
+  /** current screen of the guided walk-through; undefined = start from the top */
+  stepId?: StepId
+  /** room type being asked about / the lite room it created */
+  pendingType?: RoomType
+  pendingId?: string
+  /** the arrival scene plays once */
+  introSeen?: boolean
+}
+
+const initialLite: LiteState = { rooms: [] }
+
 const initialWizard: WizardState = { step: 0, widthM: 10, depthM: 8, shape: 'rect', corner: 'tr', notchWM: 3, notchDM: 2, doorWall: 'bottom', doorT: 0.5, cols: 4, rows: 4, paint: {}, walls: {} }
 
 interface AppState {
   persons: Person[]
-  /** 新手村：不畫圖，只記房間方位 */
-  lite: { rooms: LiteRoom[]; step: number }
+  /** 師傅來看房（/start）：不畫圖，只記房間方位；stepId／pending* 是引導流程的進度 */
+  lite: LiteState
   addLiteRoom: (r: Omit<LiteRoom, 'id'>) => string
   updateLiteRoom: (id: string, patch: Partial<LiteRoom>) => void
   removeLiteRoom: (id: string) => void
-  setLiteStep: (step: number) => void
+  setLite: (patch: Partial<LiteState>) => void
   wizard: WizardState
   setWizard: (patch: Partial<WizardState>) => void
   resetWizard: () => void
@@ -112,11 +126,11 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       persons: [],
-      lite: { rooms: [], step: 0 },
+      lite: initialLite,
       addLiteRoom: (r) => { const id = newId('lr'); set((s) => ({ lite: { ...s.lite, rooms: [...s.lite.rooms, { ...r, id }] } })); return id },
       updateLiteRoom: (id, patch) => set((s) => ({ lite: { ...s.lite, rooms: s.lite.rooms.map((r) => (r.id === id ? { ...r, ...patch } : r)) } })),
-      removeLiteRoom: (id) => set((s) => ({ lite: { ...s.lite, rooms: s.lite.rooms.filter((r) => r.id !== id) } })),
-      setLiteStep: (step) => set((s) => ({ lite: { ...s.lite, step } })),
+      removeLiteRoom: (id) => set((s) => ({ lite: { ...s.lite, rooms: s.lite.rooms.filter((r) => r.id !== id), pendingId: s.lite.pendingId === id ? undefined : s.lite.pendingId } })),
+      setLite: (patch) => set((s) => ({ lite: { ...s.lite, ...patch } })),
       wizard: initialWizard,
       setWizard: (patch) => set((s) => ({ wizard: { ...s.wizard, ...patch } })),
       resetWizard: () => set({ wizard: initialWizard }),
@@ -165,7 +179,7 @@ export const useAppStore = create<AppState>()(
       setEnvironment: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
       setEnvironmentOption: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
       setConsent: () => set({ consentedAt: new Date().toISOString() }),
-      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {}, consentedAt: undefined, wizard: initialWizard, lite: { rooms: [], step: 0 } }),
+      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {}, consentedAt: undefined, wizard: initialWizard, lite: initialLite }),
     }),
     {
       name: 'dudu-fengshui-v1',

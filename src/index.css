@@ -171,3 +171,16 @@ html.ar-active #root > * { visibility: hidden; }
 #ar-overlay-root { position: fixed; inset: 0; z-index: 50; pointer-events: none; }
 #ar-overlay-root > * { pointer-events: auto; }
 
+
+/* ── 師傅來看房（/start）：display face for the master's lines, and the beat transitions ── */
+@theme inline {
+  --font-display: "Noto Serif TC", "Songti TC", "Songti SC", "PMingLiU", "Hiragino Mincho ProN", "Yu Mincho", serif;
+}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes guide-in { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .guide-enter { animation: guide-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @keyframes guide-fade { from { opacity: 0; } to { opacity: 1; } }
+  .guide-fade { animation: guide-fade 700ms ease-out both; }
+  @keyframes guide-caret { 50% { opacity: 0; } }
+  .guide-caret { animation: guide-caret 900ms steps(1) infinite; }
+}

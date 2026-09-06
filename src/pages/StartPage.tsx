@@ -1,239 +1,302 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Compass, Plus, Trash2, X } from 'lucide-react'
-import { MasterAvatar } from '../components/MasterAvatar'
+import { ArrowLeft, Compass, X } from 'lucide-react'
 import { DirectionPad } from '../components/DirectionPad'
-import { Button, Input, NativeSelect } from '../components/mds'
 import { resolveAnalysisPlan, useAppStore } from '../store/useAppStore'
 import { PALACES, type Trigram } from '../engine/bagua'
-import { analyzePerson, groupZh, WANDERING_STARS } from '../engine/bazhai'
+import { analyzePerson, groupZh } from '../engine/bazhai'
 import { fengshuiYearOf } from '../engine/calendar'
-import { buildReport } from '../engine/report'
+import { buildReport, type Report } from '../engine/report'
 import { palaceLabel } from '../engine/annual'
-import { FACING_QUESTION, keyItemOf } from '../engine/lite'
-import { ROOM_ZH, type RoomType } from '../engine/floorplan'
+import { FACING_QUESTION, keyItemOf, type LiteRoom } from '../engine/lite'
+import { ROOM_ZH } from '../engine/floorplan'
 import { NINE_STARS, RATING_ZH } from '../engine/stars'
 import { periodOfYear } from '../engine/xuankong'
+import { buildActions } from '../engine/advice'
+import { BUILT_CHOICES, FACING_WHY, firstStep, nextStep, pendingRoomType, prevStep, progressOf, roomMenu, type GuideCtx, type StepId } from '../guide/script'
+import { Scene, choiceCls } from '../guide/Scene'
 import { cn } from '../lib/utils'
 
 const MASTER = '嘟嘟師傅'
-const ROOM_CHOICES: RoomType[] = ['master', 'bedroom', 'kids', 'kitchen', 'study', 'bathroom', 'living', 'altar']
-const STEPS = ['大門', '屋主', '今年', '房間', '更準'] as const
+const dirZh = (t: Trigram | 'center') => (t === 'center' ? '中宮' : PALACES[t].direction)
 
-/** 新手村：一次一個問題，答完馬上有回饋。 */
+/**
+ * 師傅來看房：one question per screen, asked in the master's voice, a short scene at the door,
+ * a reveal after the basics and a verdict after each room. Pure flow logic lives in guide/script.ts.
+ */
 export function StartPage() {
   const nav = useNavigate()
-  const { house, setHouse, persons, addPerson, removePerson, lite, addLiteRoom, updateLiteRoom, removeLiteRoom, setLiteStep, floors, plan } = useAppStore()
-  const step = lite.step
-  const go = (n: number) => { setLiteStep(Math.max(0, Math.min(STEPS.length - 1, n))); window.scrollTo({ top: 0 }) }
+  const { house, setHouse, persons, addPerson, removePerson, lite, addLiteRoom, updateLiteRoom, setLite, floors, plan } = useAppStore()
+  const ctx = useMemo<GuideCtx>(() => ({ introSeen: !!lite.introSeen, hasFacing: house.facingSource !== 'none', persons: persons.length, rooms: lite.rooms, pendingType: lite.pendingType, pendingId: lite.pendingId }), [lite, house.facingSource, persons.length])
+  const step: StepId = lite.stepId ?? firstStep(ctx)
   const resolved = useMemo(() => resolveAnalysisPlan(floors, plan, house, lite, 'lite'), [floors, plan, house, lite])
-  const hasRealPlan = floors.some((f) => f.outline.length >= 3 && !f.synthetic)
   const report = useMemo(() => { try { return buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: resolved.plan, floors: resolved.floors, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode }) } catch { return null } }, [persons, house, resolved])
-  const primary = report?.persons.find((p) => p.person.primary) ?? report?.persons[0]
   const facingPalace = house.facingSource !== 'none' ? (report?.xuankong.chart.facingPalace ?? null) : null
+  const [adding, setAdding] = useState(false)
+  const goTo = (id: StepId) => { setLite({ stepId: id }); setAdding(false) }
+  const back = () => {
+    const p = prevStep(step, ctx)
+    if (!p) { nav('/'); return }
+    // stepping back into a room verdict with nothing pending: re-open the last room asked about
+    const last = lite.rooms[lite.rooms.length - 1]
+    if (p === 'roomVerdict' && !pendingRoom && last) { setLite({ pendingId: last.id, pendingType: last.type, stepId: p }); setAdding(false); return }
+    goTo(p)
+  }
+  const later = (id: StepId) => window.setTimeout(() => goTo(id), 380)
+  const { n, total } = progressOf(step)
+  const askType = pendingRoomType(ctx)
+  const pendingRoom = lite.rooms.find((r) => r.id === lite.pendingId)
+  const owner = persons[0]
+  const isScene = step === 'intro' || step === 'reveal' || step === 'roomVerdict' || step === 'summary'
 
-  const bubble = [
-    house.facingSource === 'none' ? `我是${MASTER}。站在你家大門裡面往外看，是哪個方向？` : '好，方向有了。往下看結果。',
-    persons.length ? '屋主的命卦我算好了。' : '屋主是誰？出生年給我就好。',
-    '今年的流年，先講重點。',
-    lite.rooms.length ? '再加一間，或者往下走。' : '主臥在家的哪一邊？告訴我方位就好，不用畫。',
-    '想更準的話，有三條路。',
-  ][step]
+  // guard: steps that need data the user has not given yet fall back to where it is asked
+  useEffect(() => {
+    if ((step === 'reveal' || step === 'roomWhere' || step === 'roomFacing' || step === 'roomVerdict' || step === 'roomType' || step === 'summary') && house.facingSource === 'none') goTo('door')
+    else if ((step === 'roomFacing' || step === 'roomVerdict') && !pendingRoom) goTo('roomType')
+    else if (step === 'roomWhere' && !askType) goTo('roomType')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, house.facingSource, pendingRoom, askType])
 
-  return (
-    <div className="dark fixed inset-0 z-50 flex flex-col bg-[#0f1013] text-zinc-100">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,rgba(46,143,110,0.22),transparent_60%)]" />
-      <header className="relative z-10 flex h-12 shrink-0 items-center gap-3 px-3 safe-t">
-        <button className="flex size-9 items-center justify-center rounded-full bg-white/10" onClick={() => nav('/')} aria-label="離開"><X className="size-5" /></button>
-        <ol className="flex flex-1 items-center gap-1">{STEPS.map((s, i) => <li key={s} className={cn('h-1.5 flex-1 rounded-full', i <= step ? 'bg-brand' : 'bg-white/15')} aria-label={s} />)}</ol>
-        <span className="text-xs text-zinc-400">{step + 1}/{STEPS.length} {STEPS[step]}</span>
-      </header>
+  let body: ReactNode = null
 
-      <main className="relative z-10 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-md px-4 pb-6">
-          <div className="mt-1 flex items-end gap-3">
-            <MasterAvatar size={64} />
-            <div className="mb-2 rounded-2xl rounded-bl-sm bg-white px-4 py-2 text-sm font-medium text-zinc-900 shadow-lg">{bubble}</div>
+  if (step === 'intro') {
+    const start = () => { setLite({ introSeen: true }); goTo('door') }
+    body = <Scene key="intro" name={MASTER} lines={['到了。', '先別急著開門。房子要從門口看起，門是氣口，門看對了，屋裡的事才好談。']}
+      choices={[{ label: '好，從門口開始', primary: true, onPick: start }, { label: '我只想知道財位在哪', reply: '財位也得先看門。來，站到門裡。', onPick: start }]} />
+  }
+
+  if (step === 'door') {
+    body = (
+      <Ask kicker="站在門裡" ask="往外看，大門對著哪個方向？" why="向差一格，財位就換邊。">
+        <DirectionPad value={facingPalace} onChange={(t) => { setHouse({ facingBearing: PALACES[t].bearing, facingSource: 'manual' }); later('owner') }}
+          center={<Link to="/compass?return=/start" className="flex size-14 flex-col items-center justify-center rounded-full border border-brand/60 bg-brand/15 text-brand"><Compass className="size-5" /><span className="text-[10px]">羅盤</span></Link>} />
+        <p className="mt-2 text-right text-[11px] text-zinc-500">上方為北。點中間用手機羅盤實測最準。</p>
+        {facingPalace && <button className={choiceCls(true, 'mt-4')} onClick={() => goTo('owner')}>朝{PALACES[facingPalace].direction}{house.facingSource === 'compass' ? `（羅盤 ${Math.round(house.facingBearing)}°）` : ''}，沒錯</button>}
+      </Ask>
+    )
+  }
+
+  if (step === 'owner') {
+    body = (
+      <Ask kicker="進門前" ask="這個家，誰當家？" why="命卦跟著人走，床頭、書桌都看他。">
+        {persons.length > 0 && <PersonRows persons={persons} report={report} onRemove={removePerson} />}
+        {persons.length === 0 || adding ? <PersonForm label={persons.length ? '加入' : '就是這位'} onAdd={(p) => { addPerson(p); goTo('more') }} />
+          : <div className="grid gap-2"><button className={choiceCls(true)} onClick={() => goTo('more')}>就是{owner?.name ?? '這位'}</button><button className={choiceCls()} onClick={() => setAdding(true)}>換一個人</button></div>}
+      </Ask>
+    )
+  }
+
+  if (step === 'more') {
+    body = (
+      <Ask kicker="順便問" ask="還有誰要一起看？" why="一家人命卦不同，我分開講。">
+        <PersonRows persons={persons} report={report} onRemove={removePerson} />
+        {adding ? <PersonForm label="加入" onAdd={(p) => { addPerson(p); setAdding(false) }} /> : (
+          <div className="mt-2 grid gap-2">
+            <button className={choiceCls()} onClick={() => setAdding(true)}>再加一位（例如另一半、小孩）</button>
+            <button className={choiceCls(true)} onClick={() => goTo('built')}>{persons.length > 1 ? '就這些人' : `先看${owner?.name ?? '屋主'}就好`}</button>
           </div>
+        )}
+      </Ask>
+    )
+  }
 
-          {step === 0 && (
-            <section className="mt-5 space-y-4">
-              <h2 className="text-xl font-semibold">大門朝哪個方向？</h2>
-              <DirectionPad value={facingPalace} onChange={(t) => setHouse({ facingBearing: PALACES[t].bearing, facingSource: 'manual' })}
-                center={<Link to="/compass?return=/start" className="flex size-14 flex-col items-center justify-center rounded-full border border-brand/60 bg-brand/15 text-brand"><Compass className="size-5" /><span className="text-[10px]">羅盤</span></Link>} />
-              <p className="text-xs text-zinc-500">上方為北。點中間的羅盤可用手機實測，最準。</p>
-              {house.facingSource !== 'none' && report && (
-                <ResultCard title={`${PALACES[report.house.houseGua].zh}宅`} sub={`${groupZh(report.house.group)}宅，向${report.house.facing.name}山 ${Math.round(house.facingBearing)}°，坐${report.house.sitting.name}`}>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Tag tone="good">財位 {report.bazhai.wealth.map((t) => PALACES[t].direction).join('、')}</Tag>
-                    <Tag tone="info">文昌 {report.bazhai.wenchang.map((t) => (t as string) === 'center' ? '中宮' : PALACES[t as Trigram].direction).join('、')}</Tag>
-                    <Tag tone="muted">洩財 {report.bazhai.wealthLeak.map((t) => PALACES[t].direction).join('、')}</Tag>
-                  </div>
-                  <MiniGrid door={report.xuankong.chart.facingPalace} cells={Object.fromEntries([
-                    ...report.bazhai.wealthLeak.map((t) => [t, { label: '洩財', tone: 'muted' }]),
-                    ...report.bazhai.wenchang.filter((t) => (t as string) !== 'center').map((t) => [t, { label: '文昌', tone: 'info' }]),
-                    ...report.bazhai.wealth.map((t) => [t, { label: '財位', tone: 'good' }]),
-                  ])} />
-                  <p className="text-xs text-zinc-400">財位放聚寶盆或綠植，文昌位放書桌，洩財位別放魚缸。{report.period} 運玄空盤「{report.xuankong.patternZh}」。</p>
-                  <label className="flex items-center justify-between gap-3 rounded-lg bg-black/25 px-3 py-2 text-sm">
-                    <span>房子大約哪一年蓋的？<span className="block text-xs text-zinc-500">不知道就用現在的年份</span></span>
-                    <Input type="number" className="w-24 border-white/15 bg-black/20 text-right text-zinc-100" value={house.periodYear} onChange={(e) => setHouse({ periodYear: Number(e.target.value) || house.periodYear })} />
-                  </label>
-                  <p className="text-xs text-zinc-500">{periodOfYear(house.periodYear)} 運</p>
-                </ResultCard>
-              )}
-            </section>
-          )}
-
-          {step === 1 && (
-            <section className="mt-5 space-y-4">
-              <h2 className="text-xl font-semibold">屋主是誰？</h2>
-              <PersonForm onAdd={(p) => addPerson(p)} label={persons.length ? '再加一位（例如女屋主）' : '新增屋主'} />
-              {persons.map((p) => {
-                const by = fengshuiYearOf(new Date(p.birthDate + 'T12:00:00')).year
-                const r = analyzePerson(by, p.gender)
-                const compat = report ? r.group === report.house.group : null
-                return (
-                  <ResultCard key={p.id} title={p.name} sub={`${by} 年生，命卦${PALACES[r.gua].zh}，${groupZh(r.group)}命`} action={<button className="text-zinc-400" onClick={() => removePerson(p.id)} aria-label="移除"><Trash2 className="size-4" /></button>}>
-                    {compat != null && <p className={compat ? 'text-brand' : 'text-zinc-300'}>{compat ? '和這間房子同一組，順。' : '和房子不同組。床頭、書桌朝自己的吉方就補得回來。'}</p>}
-                    <div className="flex flex-wrap gap-1.5"><Tag tone="good">宜朝 {r.bestDirections.slice(0, 2).map((d) => `${PALACES[d].direction}（${WANDERING_STARS[r.stars[d]].zh}）`).join('、')}</Tag><Tag tone="bad">避開 {r.worstDirections.slice(0, 2).map((d) => PALACES[d].direction).join('、')}</Tag></div>
-                    <MiniGrid door={facingPalace ?? undefined} cells={Object.fromEntries([...r.worstDirections.map((d) => [d, { label: WANDERING_STARS[r.stars[d]].zh, tone: 'bad' }]), ...r.bestDirections.map((d) => [d, { label: WANDERING_STARS[r.stars[d]].zh, tone: 'good' }])])} />
-                  </ResultCard>
-                )
-              })}
-            </section>
-          )}
-
-          {step === 2 && report && (
-            <section className="mt-5 space-y-4">
-              <h2 className="text-xl font-semibold">{report.year} 年要注意的</h2>
-              <ResultCard title={`五黃在${palaceLabel(report.annual.data.wuhuang)}，二黑在${palaceLabel(report.annual.data.erhei)}`} sub="今年不動土、不裝修、不釘釘子，保持安靜整潔">
-                <div className="flex flex-wrap gap-1.5"><Tag tone="good">八白財星 {palaceLabel(report.annual.data.babai)}</Tag><Tag tone="good">九紫喜慶 {palaceLabel(report.annual.data.jiuzi)}</Tag><Tag tone="muted">太歲 {report.annual.data.taisui.taisuiMountain}山</Tag><Tag tone="muted">三煞 {report.annual.data.taisui.sanshaBranches.join('')}</Tag></div>
-                <MiniGrid door={report.xuankong.chart.facingPalace} cells={Object.fromEntries(report.xuankong.palaces.map((p) => [p.palace, { label: NINE_STARS[p.annualStar]!.zh, tone: [5, 2].includes(p.annualStar) ? 'bad' : [8, 9].includes(p.annualStar) ? 'good' : [3, 7].includes(p.annualStar) ? 'muted' : 'plain' }]))} />
-                {report.persons.some((p) => p.offendingTaisui) && <p className="text-rose-300">{report.persons.filter((p) => p.offendingTaisui).map((p) => `${p.person.name}屬${p.zodiac}，今年${p.offendingTaisui}`).join('；')}，凡事穩一點。</p>}
-              </ResultCard>
-            </section>
-          )}
-
-          {step === 3 && report && (
-            <section className="mt-5 space-y-4">
-              <h2 className="text-xl font-semibold">房間在家的哪個方位？</h2>
-              <p className="text-sm text-zinc-400">站在家正中央往那間房看。不用畫圖，加幾間分析幾間。</p>
-              {lite.rooms.map((r) => {
-                const pe = report.xuankong.palaces.find((p) => p.palace === r.palace)!
-                const item = report.bazhai.items.find((it) => it.itemId === `lite_${r.id}_${keyItemOf(r.type) ?? ''}`)
-                const q = FACING_QUESTION[r.type]
-                return (
-                  <ResultCard key={r.id} title={ROOM_ZH[r.type]} sub={`在${PALACES[r.palace].direction}方，${PALACES[r.palace].zh}宮`} action={<button className="text-zinc-400" onClick={() => removeLiteRoom(r.id)} aria-label="移除"><Trash2 className="size-4" /></button>}>
-                    {q && (<div><div className="mb-1.5 text-xs text-zinc-400">{q}</div><DirectionPad size="sm" value={r.facing ?? null} onChange={(t) => updateLiteRoom(r.id, { facing: t })} center={<span className="text-xs text-zinc-500">朝向</span>} /></div>)}
-                    <div className="flex flex-wrap gap-1.5">
-                      <Tag tone={pe.combo.rating === 'great' || pe.combo.rating === 'good' ? 'good' : pe.combo.rating === 'neutral' ? 'plain' : 'bad'}>飛星 {pe.mountainStar}{pe.waterStar} {RATING_ZH[pe.combo.rating]}</Tag>
-                      <Tag tone={[5, 2].includes(pe.annualStar) ? 'bad' : [8, 9].includes(pe.annualStar) ? 'good' : 'plain'}>今年{NINE_STARS[pe.annualStar]!.zh}</Tag>
-                      {primary && <Tag tone={WANDERING_STARS[primary.stars[r.palace]].auspicious ? 'good' : 'bad'}>{primary.person.name} {WANDERING_STARS[primary.stars[r.palace]].zh}</Tag>}
-                    </div>
-                    {item && item.perPerson.map((pp) => <p key={pp.personId} className={pp.verdict === 'good' ? 'text-brand' : 'text-rose-300'}>{item.label.replace(/（.+）/, '')}對{pp.name}是{pp.note}{pp.verdict === 'bad' ? '，建議改朝吉方。' : '，很好。'}</p>)}
-                    {[5, 2].includes(pe.annualStar) && <p className="text-zinc-300">今年{NINE_STARS[pe.annualStar]!.zh}到這裡，少動土、保持安靜整潔。</p>}
-                  </ResultCard>
-                )
-              })}
-              <AddRoom onAdd={(type, palace) => addLiteRoom({ type, palace })} taken={lite.rooms.map((r) => r.palace)} />
-            </section>
-          )}
-
-          {step === 4 && report && (
-            <section className="mt-5 space-y-4">
-              <h2 className="text-xl font-semibold">目前 {report.scores.overall} 分，接下來？</h2>
-              <p className="text-sm text-zinc-400">{hasRealPlan ? '你已經有一張平面圖，報告會以它為準，並加上門沖床、樑壓床這些位置關係。' : '到這裡已經能看清單。想看門沖床、樑壓床這些位置關係，就需要一張平面圖。'}</p>
-              <div className="space-y-2">
-                <Link to="/report" className="block"><Button variant="brand" size="lg" className="w-full">看怎麼做（清單）</Button></Link>
-                <Link to="/story" className="block"><Button variant="outline" size="lg" className="w-full">讓師傅帶我 3D 看一遍</Button></Link>
-                <Link to="/plan/wizard" className="block"><Button variant="outline" size="lg" className="w-full">畫平面圖（精靈，一分鐘）</Button></Link>
-                <Link to="/scan" className="block"><Button variant="ghost" size="lg" className="w-full">用手機鏡頭掃描房子</Button></Link>
-              </div>
-            </section>
-          )}
+  if (step === 'built') {
+    body = (
+      <Ask kicker="這房子" ask="大概哪一年蓋好的？" why="哪一運入住，飛星盤就不一樣。">
+        <div className="grid grid-cols-2 gap-2">
+          {BUILT_CHOICES.map((c) => <button key={c.year} className={choiceCls(false, 'flex flex-col py-2.5')} onClick={() => { setHouse({ periodYear: c.year }); later('reveal') }}><span>{c.label}</span><span className="text-xs text-zinc-400">{periodOfYear(c.year)} 運</span></button>)}
         </div>
-      </main>
+        <Escape label="不知道，先用現在的運" onPick={() => { setHouse({ periodYear: new Date().getFullYear() }); goTo('reveal') }} />
+      </Ask>
+    )
+  }
 
-      {step < 4 && (
-        <footer className="relative z-10 shrink-0 border-t border-white/10 bg-[#0f1013]/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur">
-          <div className="mx-auto flex max-w-md gap-2">
-            <Button variant="outline" size="lg" className="border-white/15 bg-white/5 text-zinc-100" onClick={() => go(step - 1)} disabled={step === 0} aria-label="上一步"><ArrowLeft /></Button>
-            <Button variant="brand" size="lg" className="flex-1" disabled={(step === 0 && house.facingSource === 'none') || (step === 1 && !persons.length)} onClick={() => go(step + 1)}>
-              {step === 3 && !lite.rooms.length ? '先跳過' : `下一步：${STEPS[step + 1]}`}<ArrowRight />
-            </Button>
-          </div>
-        </footer>
-      )}
-    </div>
-  )
-}
+  if (step === 'reveal' && report) {
+    const primary = report.persons.find((p) => p.person.primary) ?? report.persons[0]
+    const lines = [
+      `${PALACES[report.house.houseGua].zh}宅，坐${report.house.sitting.name}向${report.house.facing.name}，${report.period} 運。`,
+      `財位在${report.bazhai.wealth.map((t) => PALACES[t].direction).join('、')}，文昌在${report.bazhai.wenchang.map(dirZh).join('、')}。洩財位在${report.bazhai.wealthLeak.map((t) => PALACES[t].direction).join('、')}，魚缸別放那。`,
+    ]
+    if (primary) {
+      const best = primary.bestDirections[0]!
+      lines.push(`${primary.person.name}是${PALACES[primary.gua].zh}命，${groupZh(primary.group)}命。${primary.compatible ? '跟這房子同一組，順。' : `跟房子不同組，不要緊，床頭朝${PALACES[best].direction}就補得回來。`}`)
+    }
+    const cells = Object.fromEntries([
+      ...report.bazhai.wealthLeak.map((t) => [t, { label: '洩財', tone: 'muted' }]),
+      ...report.bazhai.wenchang.filter((t) => (t as string) !== 'center').map((t) => [t, { label: '文昌', tone: 'info' }]),
+      ...report.bazhai.wealth.map((t) => [t, { label: '財位', tone: 'good' }]),
+    ]) as Partial<Record<Trigram, GridCell>>
+    body = <Scene key="reveal" lines={lines} aside={<MiniGrid door={report.xuankong.chart.facingPalace} cells={cells} />}
+      choices={[{ label: '進屋，看房間', primary: true, onPick: () => goTo(nextStep('reveal', ctx)) }, { label: '先這樣，看清單', onPick: () => nav('/report') }]} />
+  }
 
-function ResultCard({ title, sub, action, children }: { title: string; sub?: string; action?: ReactNode; children: ReactNode }) {
+  if (step === 'roomWhere' && askType) {
+    const taken = lite.rooms.filter((r) => r.id !== pendingRoom?.id).map((r) => r.palace)
+    body = (
+      <Ask kicker={lite.rooms.length && !pendingRoom ? '下一間' : '進屋了'} ask={`${ROOM_ZH[askType]}在家的哪一邊？`} why="站在客廳中央，往那間房看的方向。">
+        <DirectionPad value={pendingRoom?.palace ?? null} dim={taken} center={<span className="text-xs text-zinc-500">中</span>}
+          onChange={(t) => {
+            let id = pendingRoom?.id
+            if (id) updateLiteRoom(id, { palace: t }); else id = addLiteRoom({ type: askType, palace: t })
+            setLite({ pendingId: id, pendingType: askType })
+            later(nextStep('roomWhere', { ...ctx, pendingType: askType, pendingId: id }))
+          }} />
+        <p className="mt-2 text-right text-[11px] text-zinc-500">上方為北。已有房間的格子會變淡。</p>
+        <Escape label="這間先跳過" onPick={() => { setLite({ pendingType: undefined, pendingId: undefined }); goTo(lite.rooms.length ? 'roomType' : 'summary') }} />
+      </Ask>
+    )
+  }
+
+  if (step === 'roomFacing' && pendingRoom) {
+    body = (
+      <Ask kicker={`站在${ROOM_ZH[pendingRoom.type]}裡`} ask={FACING_QUESTION[pendingRoom.type] ?? '朝哪個方向？'} why={FACING_WHY[pendingRoom.type]}>
+        <DirectionPad value={pendingRoom.facing ?? null} center={<span className="text-xs text-zinc-500">朝向</span>} onChange={(t) => { updateLiteRoom(pendingRoom.id, { facing: t }); later('roomVerdict') }} />
+        <p className="mt-2 text-right text-[11px] text-zinc-500">上方為北</p>
+        <Escape label="不確定，先略過" onPick={() => goTo('roomVerdict')} />
+      </Ask>
+    )
+  }
+
+  if (step === 'roomVerdict' && pendingRoom && report) {
+    body = <Scene key={`verdict_${pendingRoom.id}`} lines={roomLines(report, pendingRoom)}
+      choices={[{ label: '再看下一間', primary: true, onPick: () => { setLite({ pendingType: undefined, pendingId: undefined }); goTo('roomType') } }, { label: '夠了，聽結論', onPick: () => { setLite({ pendingType: undefined, pendingId: undefined }); goTo('summary') } }]} />
+  }
+
+  if (step === 'roomType') {
+    body = (
+      <Ask kicker="還有嗎" ask="還有哪一間要看？" why="加幾間看幾間，不用一次講完。">
+        <div className="grid grid-cols-2 gap-2">
+          {roomMenu(lite.rooms).map((t) => <button key={t} className={choiceCls()} onClick={() => { setLite({ pendingType: t, pendingId: undefined }); goTo('roomWhere') }}>{ROOM_ZH[t]}</button>)}
+        </div>
+        <button className={choiceCls(true, 'mt-3')} onClick={() => { setLite({ pendingType: undefined, pendingId: undefined }); goTo('summary') }}>夠了，聽結論</button>
+        {lite.rooms.length > 0 && <p className="mt-3 text-xs text-zinc-500">看過：{lite.rooms.map((r) => `${ROOM_ZH[r.type]}（${PALACES[r.palace].direction}）`).join('、')}</p>}
+      </Ask>
+    )
+  }
+
+  if (step === 'summary' && report) {
+    body = <Scene key="summary" lines={summaryLines(report)}
+      choices={[{ label: '看怎麼做（清單）', primary: true, onPick: () => nav('/report') }, { label: '讓師傅 3D 帶我走一遍', onPick: () => nav('/story') }, { label: '畫平面圖，看門沖、樑壓', onPick: () => nav('/plan/wizard') }]} />
+  }
+
   return (
-    <div className="sheet-enter space-y-3 rounded-2xl border border-white/10 bg-white/6 p-4 text-sm leading-relaxed">
-      <div className="flex items-start justify-between gap-2">
-        <div><div className="text-base font-semibold">{title}</div>{sub && <div className="text-xs text-zinc-400">{sub}</div>}</div>
-        {action}
-      </div>
-      {children}
+    <div className="dark fixed inset-0 z-50 flex flex-col overflow-hidden bg-[#0c0d10] text-zinc-100">
+      {step === 'intro' && <img src={`${import.meta.env.BASE_URL}cover.jpg`} alt="" className="guide-fade absolute inset-0 h-full w-full object-cover object-[50%_30%] opacity-80 [mask-image:linear-gradient(to_bottom,black_35%,transparent_85%)]" />}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[70%] bg-[radial-gradient(70%_55%_at_50%_100%,rgba(214,179,92,0.14),transparent_70%)]" />
+      <header className="relative z-10 flex h-12 shrink-0 items-center gap-3 px-3 safe-t">
+        <button className="flex size-9 items-center justify-center rounded-full bg-white/10" onClick={back} aria-label={prevStep(step, ctx) ? '上一題' : '離開'}>{prevStep(step, ctx) ? <ArrowLeft className="size-5" /> : <X className="size-5" />}</button>
+        <div className="h-px flex-1 overflow-hidden bg-white/10"><div className="h-full bg-brand transition-[width] duration-500" style={{ width: `${(n / total) * 100}%` }} /></div>
+        {step === 'intro' ? <button className="text-xs text-zinc-400" onClick={() => { setLite({ introSeen: true }); goTo('door') }}>跳過</button> : <span className="w-10 text-right text-xs tabular-nums text-zinc-400">{n} / {total}</span>}
+      </header>
+      <main className="relative z-10 flex flex-1 flex-col justify-end overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+        <div key={step} className={cn('mx-auto w-full max-w-md guide-enter', isScene && 'pb-2')}>{body}</div>
+      </main>
     </div>
   )
 }
 
-function Tag({ tone, children }: { tone: 'good' | 'info' | 'bad' | 'muted' | 'plain'; children: ReactNode }) {
-  const c = { good: 'bg-brand/20 text-brand', info: 'bg-sky-500/20 text-sky-200', bad: 'bg-rose-500/20 text-rose-200', muted: 'bg-white/10 text-zinc-300', plain: 'bg-white/5 text-zinc-400' }[tone]
-  return <span className={cn('inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium', c)}>{children}</span>
+/* ─── copy ───────────────────────────────────────────────────────────────── */
+
+function roomLines(report: Report, room: LiteRoom): string[] {
+  const pe = report.xuankong.palaces.find((p) => p.palace === room.palace)
+  const lines: string[] = []
+  if (pe) {
+    lines.push(`${ROOM_ZH[room.type]}在${PALACES[room.palace].direction}方，${PALACES[room.palace].zh}宮。這一宮飛星${pe.mountainStar}${pe.waterStar}，${RATING_ZH[pe.combo.rating]}。`)
+    const star = NINE_STARS[pe.annualStar]!.zh
+    lines.push([5, 2].includes(pe.annualStar) ? `今年${star}到這裡，少動土、保持安靜整潔。` : [8, 9].includes(pe.annualStar) ? `今年${star}到這裡，多用、多亮燈，是好事。` : `今年流年${star}在這裡，平平。`)
+  }
+  const item = report.bazhai.items.find((it) => it.itemId === `lite_${room.id}_${keyItemOf(room.type) ?? ''}`)
+  if (item && room.facing) {
+    const what = item.label.replace(/（.+）/, '').replace(/朝向$/, '')
+    for (const pp of item.perPerson) lines.push(`${what}朝${PALACES[room.facing].direction}，對${pp.name}是${pp.note}，${pp.verdict === 'good' ? '很好，不用動。' : '建議改朝吉方。'}`)
+  }
+  return lines.length ? lines : ['這間我看過了。']
 }
+
+function summaryLines(report: Report): string[] {
+  const actions = buildActions(report)
+  const top = actions.filter((a) => a.priority === 1).slice(0, 3)
+  const a = report.annual.data
+  return [
+    '走完一圈了。',
+    `整體我給 ${report.scores.overall} 分。${report.scores.overall >= 75 ? '底子不錯。' : report.scores.overall >= 50 ? '有幾處值得動手。' : '有幾個明顯的問題，都有解法。'}`,
+    top.length ? `最要緊的：${top.map((t) => t.title).join('；')}。` : '沒有需要優先處理的大問題。',
+    `${report.year} 年五黃在${palaceLabel(a.wuhuang)}、二黑在${palaceLabel(a.erhei)}，這兩處別動土、別釘釘子。`,
+  ]
+}
+
+/* ─── pieces ─────────────────────────────────────────────────────────────── */
+
+function Ask({ kicker, ask, why, children }: { kicker?: string; ask: string; why?: string; children: ReactNode }) {
+  return (
+    <div>
+      {kicker && <div className="mb-2 text-xs tracking-[0.3em] text-brand">{kicker}</div>}
+      <h2 className="font-display text-[26px] leading-snug text-[#efe7d6]">{ask}</h2>
+      {why && <p className="mt-1.5 text-[13px] text-amber-200/70">{why}</p>}
+      <div className="mt-5">{children}</div>
+    </div>
+  )
+}
+
+function Escape({ label, onPick }: { label: string; onPick: () => void }) {
+  return <button className="mt-4 w-full py-2 text-center text-sm text-zinc-400 underline underline-offset-4" onClick={onPick}>{label}</button>
+}
+
+const fieldCls = 'h-12 w-full rounded-xl border border-white/15 bg-white/[0.04] px-3 text-base text-zinc-100 placeholder:text-zinc-500 focus:border-brand focus:outline-none'
 
 function PersonForm({ onAdd, label }: { onAdd: (p: { name: string; birthDate: string; gender: 'male' | 'female' }) => void; label: string }) {
   const [name, setName] = useState('')
   const [birth, setBirth] = useState('1990-01-01')
   const [gender, setGender] = useState<'male' | 'female'>('male')
-  const cls = 'border-white/15 bg-black/20 text-zinc-100'
   return (
-    <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/6 p-3">
-      <Input className={cls} placeholder="稱呼（例：爸爸）" value={name} onChange={(e) => setName(e.target.value)} />
-      <NativeSelect className={cls} value={gender} onChange={(e) => setGender(e.target.value as 'male' | 'female')}><option value="male">男</option><option value="female">女</option></NativeSelect>
-      <Input type="date" className={cn('col-span-2', cls)} value={birth} onChange={(e) => setBirth(e.target.value)} />
-      <Button variant="brand" className="col-span-2" onClick={() => { if (!birth) return; onAdd({ name: name.trim() || '屋主', birthDate: birth, gender }); setName('') }}><Plus />{label}</Button>
+    <div className="grid grid-cols-2 gap-2">
+      <input className={cn(fieldCls, 'col-span-2')} placeholder="怎麼稱呼（例：我、老公、媽媽）" value={name} onChange={(e) => setName(e.target.value)} />
+      {(['male', 'female'] as const).map((g) => <button key={g} type="button" className={choiceCls(gender === g)} onClick={() => setGender(g)}>{g === 'male' ? '男' : '女'}</button>)}
+      <label className="col-span-2 text-xs text-zinc-400">出生日期（國曆）<input type="date" className={cn(fieldCls, 'mt-1')} value={birth} onChange={(e) => setBirth(e.target.value)} /></label>
+      <button type="button" className={choiceCls(true, 'col-span-2')} disabled={!birth} onClick={() => { onAdd({ name: name.trim() || '屋主', birthDate: birth, gender }); setName('') }}>{label}</button>
     </div>
   )
 }
 
-function AddRoom({ onAdd, taken }: { onAdd: (type: RoomType, palace: Trigram) => void; taken: Trigram[] }) {
-  const [type, setType] = useState<RoomType>('master')
-  const [palace, setPalace] = useState<Trigram | null>(null)
+function PersonRows({ persons, report, onRemove }: { persons: { id: string; name: string; birthDate: string; gender: 'male' | 'female' }[]; report: Report | null; onRemove: (id: string) => void }) {
   return (
-    <div className="space-y-3 rounded-2xl border border-dashed border-white/20 p-4">
-      <div className="text-sm font-medium">加一間房</div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1">{ROOM_CHOICES.map((t) => <button key={t} onClick={() => setType(t)} className={cn('shrink-0 rounded-lg border px-3 py-1.5 text-sm', type === t ? 'border-brand bg-brand/20' : 'border-white/15 text-zinc-300')}>{ROOM_ZH[t]}</button>)}</div>
-      <div className="text-xs text-zinc-400">{ROOM_ZH[type]}在家的哪個方位？（上方為北）</div>
-      <DirectionPad size="sm" value={palace} onChange={setPalace} dim={taken} center={<span className="text-xs text-zinc-500">中</span>} />
-      <Button variant="brand" className="w-full" disabled={!palace} onClick={() => { if (palace) { onAdd(type, palace); setPalace(null) } }}><Plus />加入{ROOM_ZH[type]}</Button>
-    </div>
+    <ul className="mb-3 divide-y divide-white/10 rounded-xl border border-white/10">
+      {persons.map((p) => {
+        const by = fengshuiYearOf(new Date(p.birthDate + 'T12:00:00')).year
+        const r = analyzePerson(by, p.gender)
+        const compat = report && report.house ? r.group === report.house.group : null
+        return (
+          <li key={p.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+            <span className="flex-1"><span className="font-medium">{p.name}</span><span className="ml-2 text-zinc-400">{by} 年生・{PALACES[r.gua].zh}命</span>{compat != null && <span className={cn('ml-2 text-xs', compat ? 'text-brand' : 'text-amber-200/80')}>{compat ? '同組' : '不同組'}</span>}</span>
+            <button className="text-zinc-500" onClick={() => onRemove(p.id)} aria-label="移除"><X className="size-4" /></button>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
-/** Nine-palace grid (north up) with a label per cell. */
-function MiniGrid({ cells, door }: { cells: Partial<Record<Trigram, { label: string; tone: 'good' | 'info' | 'bad' | 'muted' | 'plain' }>>; door?: Trigram }) {
+type GridCell = { label: string; tone: 'good' | 'info' | 'bad' | 'muted' | 'plain' }
+
+/** Nine-palace grid (north up) with a label per cell; kept small so it reads as a note, not a dashboard. */
+function MiniGrid({ cells, door }: { cells: Partial<Record<Trigram, GridCell>>; door?: Trigram }) {
   const grid: (Trigram | 'center')[][] = [['qian', 'kan', 'gen'], ['dui', 'center', 'zhen'], ['kun', 'li', 'xun']]
   const tone = { good: 'bg-brand/25 text-brand', info: 'bg-sky-500/25 text-sky-200', bad: 'bg-rose-500/25 text-rose-200', muted: 'bg-white/10 text-zinc-300', plain: 'bg-white/5 text-zinc-400' }
   return (
-    <div>
-      <div className="grid grid-cols-3 gap-1.5">
+    <div className="max-w-[240px]">
+      <div className="grid grid-cols-3 gap-1">
         {grid.flat().map((t) => {
           const c = t === 'center' ? undefined : cells[t]
           return (
-            <div key={t} className={cn('flex h-16 flex-col items-center justify-center rounded-lg text-sm', c ? tone[c.tone] : 'bg-white/5 text-zinc-500', t === door && 'ring-2 ring-white/70')}>
+            <div key={t} className={cn('flex h-12 flex-col items-center justify-center rounded-md text-xs', c ? tone[c.tone] : 'bg-white/5 text-zinc-500', t === door && 'ring-1 ring-white/70')}>
               <span className="font-medium">{t === 'center' ? '中' : PALACES[t].direction}</span>
-              {c && <span className="text-xs">{c.label}</span>}
-              {t === door && <span className="text-[10px] text-zinc-200">大門</span>}
+              {c && <span className="text-[10px]">{c.label}</span>}
+              {t === door && <span className="text-[9px] text-zinc-200">大門</span>}
             </div>
           )
         })}
       </div>
-      <p className="mt-1 text-right text-[11px] text-zinc-500">上方為北</p>
+      <p className="mt-1 text-[10px] text-zinc-500">上方為北</p>
     </div>
   )
 }

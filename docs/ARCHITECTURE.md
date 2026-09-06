@@ -69,7 +69,10 @@ src/store/         zustand + localStorage 持久化
 - Tier 2：iOS 用 Variant Launch。`main.tsx` 在 iOS 且 `VITE_VARIANT_LAUNCH_KEY` 存在時提早注入 `https://launchar.app/sdk/v1?key=…`（不帶 `redirect=true`，由掃描頁決定何時交棒）；SDK 觸發 `vlaunch-initialized`，`detail.webXRStatus` 為 `supported`（已在 Launch 檢視器內，直接走 Tier 1）／`launch-required`（按鈕以 `launchUrl` 交棒 App Clip）／`unsupported`。`startARSession` 只硬性要求 `hit-test`，`local-floor` 為選配（Launch 檢視器可能只給 `local`），參考空間依 `session.enabledFeatures` 決定。Variant Launch 的 DOM overlay 是「隱藏 overlay root 以外所有元素」模擬的，故 overlay root 為 React 樹外的 `#ar-overlay-root`，UI 以 `createPortal` 渲染；session 期間 `html.ar-active` 讓 body／#root 背景透明（iOS 相機在網頁後方）；`vlaunch-ar-tracking` 狀態轉成中文提示（特徵不足→對準有紋理地面）。Zappar 因自架僅限 Enterprise 且 github.io 不在授權白名單而排除；8th Wall（2026 起開源免費、可自架）為第二 fallback，但需 6.6 MB 與另一套 renderer 管線、尺度需使用者校正，故未整合。
 - Tier 3：`FloorPlan.underlay` 照片底圖（縮圖 ≤ 1600px JPEG 存 localStorage）＋兩點比例校正；以及相機羅盤疊圖。全平台可用。
 
-## 新手村（lite 模式）
+## 師傅來看房（/start，lite 模式）
+
+`guide/script.ts` 是純狀態機：`StepId`（intro／door／owner／more／built／reveal／roomWhere／roomFacing／roomVerdict／roomType／summary）、`nextStep`／`prevStep`（房間迴圈：roomType 選了房型 → roomWhere → 有關鍵家具的房型再問 roomFacing → roomVerdict → 回到 roomType）、`progressOf`（固定七格脊椎）、屋齡分桶 `BUILT_CHOICES`。進度與待問房間（`stepId`、`pendingType`、`pendingId`、`introSeen`）存在 store 的 `lite`，重整不會掉。`guide/Scene.tsx` 是對話節拍（`useTypewriter` 逐字、點一下加速、講完才出選項、選項可帶一句回話）；`pages/StartPage.tsx` 只負責把每個 step 畫出來。文案原則：一題一畫面、師傅口吻、每題一行「為什麼要問」、每題有台階、中途揭曉（不把價值留到最後）。
+
 
 `engine/lite.ts`：`LiteRoom { type, palace, facing? }` 只記房間在哪一宮與關鍵家具朝向；`synthesizePlan(facing, rooms)` 合成 9×9 m 北上示意屋（大門在朝向那一側、房間佔對應宮位的 3×3 格、家具置中並依 facing 轉向，`plan.synthetic = true`）。`store.resolveAnalysisPlan()` 在沒有真實平面圖時回傳示意屋；`buildReport` 對 synthetic 跳過形勢規則並改用三維度加權。
 
