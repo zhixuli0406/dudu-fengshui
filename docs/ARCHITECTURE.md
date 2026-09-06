@@ -69,6 +69,10 @@ src/store/         zustand + localStorage 持久化
 - Tier 2：iOS 用 Variant Launch。`main.tsx` 在 iOS 且 `VITE_VARIANT_LAUNCH_KEY` 存在時提早注入 `https://launchar.app/sdk/v1?key=…`（不帶 `redirect=true`，由掃描頁決定何時交棒）；SDK 觸發 `vlaunch-initialized`，`detail.webXRStatus` 為 `supported`（已在 Launch 檢視器內，直接走 Tier 1）／`launch-required`（按鈕以 `launchUrl` 交棒 App Clip）／`unsupported`。`startARSession` 只硬性要求 `hit-test`，`local-floor` 為選配（Launch 檢視器可能只給 `local`），參考空間依 `session.enabledFeatures` 決定。Variant Launch 的 DOM overlay 是「隱藏 overlay root 以外所有元素」模擬的，故 overlay root 為 React 樹外的 `#ar-overlay-root`，UI 以 `createPortal` 渲染；session 期間 `html.ar-active` 讓 body／#root 背景透明（iOS 相機在網頁後方）；`vlaunch-ar-tracking` 狀態轉成中文提示（特徵不足→對準有紋理地面）。Zappar 因自架僅限 Enterprise 且 github.io 不在授權白名單而排除；8th Wall（2026 起開源免費、可自架）為第二 fallback，但需 6.6 MB 與另一套 renderer 管線、尺度需使用者校正，故未整合。
 - Tier 3：`FloorPlan.underlay` 照片底圖（縮圖 ≤ 1600px JPEG 存 localStorage）＋兩點比例校正；以及相機羅盤疊圖。全平台可用。
 
+## 平面圖精靈
+
+`engine/wizard.ts`：`outlineFromDims`（方形／L 形外牆）、`doorOnWall`（門貼牆、朝屋內）、`gridCells`（外牆內的格子）、`cellsToRooms`（同類相鄰格子 flood-fill，`unionCells` 以邊界邊配對串成直角多邊形，失敗時退回逐格矩形）、`placeAgainstWall`（依物件慣例決定 facing：床頭／書桌朝牆，灶口／馬桶／沙發／神位背牆）、`roomDoorTowards`（房門開在朝屋中心那面牆）。精靈狀態存在 store `wizard`，完成時以 `setFloors` 寫入單一樓層。
+
 ## 多樓層
 
 `store.floors[]` 為各層 `FloorPlan`（`name`、`level`，0 = 主層），`plan` 永遠等於 `floors[activeFloor]`。各層以同一外牆原點繪製（新增樓層預設複製外牆）。`runAllFormRules(floors)` 對每層跑單層規則（標記樓層），再以 `crossFloorRules` 對相鄰層（level 差 1）做投影重疊判定（房間重疊率 ≥ 30% 以取樣估算；物件以旋轉矩形 AABB 重疊）。方位與飛星分析以 `mainFloor()`（含大門者，否則 level 0）為準。

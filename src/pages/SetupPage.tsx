@@ -11,7 +11,8 @@ import { periodOfYear } from '../engine/xuankong'
 import { mountainOf } from '../engine/mountains24'
 
 export function SetupPage() {
-  const { persons, addPerson, removePerson, updatePerson, house, setHouse } = useAppStore()
+  const { persons, addPerson, removePerson, updatePerson, house, setHouse, floors } = useAppStore()
+  const hasPlan = floors.some((f) => f.outline.length >= 3)
   const [name, setName] = useState('')
   const [birth, setBirth] = useState('1990-01-01')
   const [gender, setGender] = useState<'male' | 'female'>('male')
@@ -111,7 +112,7 @@ export function SetupPage() {
             </Field>
           </div>
         </section>
-        <Link to="/plan"><Button variant="brand" size="lg" className="w-full">下一步：平面圖</Button></Link>
+        <Link to={hasPlan ? '/plan' : '/plan/wizard'}><Button variant="brand" size="lg" className="w-full">下一步：平面圖</Button></Link>
       </Page>
     </>
   )

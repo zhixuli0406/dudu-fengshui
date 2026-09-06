@@ -152,7 +152,7 @@ export function ScanPage() {
         )}
         <div className="grid grid-cols-2 gap-2">
           <Button variant="brand" size="lg" onClick={start} disabled={!supported || running || busy}>開始掃描</Button>
-          <Button variant="outline" size="lg" onClick={() => nav('/plan')}><PenLine />手繪或描圖</Button>
+          <Button variant="outline" size="lg" onClick={() => nav('/plan/wizard')}><PenLine />改用精靈</Button>
         </div>
         {err && <p className="text-sm text-destructive">{err}</p>}
         <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, RotateCcw, RotateCw, ScanLine, Share2, Square, Trash2, Undo2, X } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, RotateCcw, RotateCw, ScanLine, Share2, Sparkles, Square, Trash2, Undo2, X } from 'lucide-react'
 import { PlanEditor, type EditorMode } from '../components/PlanEditor'
 import { Page as _Page, PageHeader } from '../components/AppShell'
 import { Badge, Button, Input, NativeSelect, Segmented } from '../components/mds'
@@ -33,7 +33,8 @@ const MODES: { value: EditorMode; label: string; icon: typeof PenLine }[] = [
 export function PlanPage() {
   const { plan, floors, activeFloor, setActiveFloor, addFloor, removeFloor, updatePlan, addRoom, updateRoom, removeRoom, addItem, updateItem, removeItem, setPlan, setFloors, house, setHouse, persons, settings, setSettings } = useAppStore()
   const nav = useNavigate()
-  const [mode, setMode] = useState<EditorMode>(plan.outline.length >= 3 ? 'select' : 'outline')
+  const [params] = useSearchParams()
+  const [mode, setMode] = useState<EditorMode>((params.get('mode') as EditorMode | null) ?? (plan.outline.length >= 3 ? 'select' : 'outline'))
   const [roomType, setRoomType] = useState<RoomType>('living')
   const [itemType, setItemType] = useState<ItemType>('mainDoor')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -102,7 +103,7 @@ export function PlanPage() {
 
   return (
     <div className="mx-auto flex h-[calc(100dvh-3.75rem-env(safe-area-inset-bottom))] w-full max-w-2xl flex-col sm:border-x sm:border-surface-border">
-      <PageHeader title="平面圖" subtitle={`第 2 步，${plan.name ?? '1F'}${findings.length ? `，${findings.length} 項待處理` : ''}`}
+      <PageHeader title="平面圖微調" subtitle={`${plan.name ?? '1F'}${findings.length ? `，${findings.length} 項待處理` : ''}`}
         right={<div className="flex gap-1"><Button variant="ghost" size="icon-sm" aria-label="顯示設定" onClick={() => setSheet('display')}><Eye /></Button><Button variant="ghost" size="icon-sm" aria-label="更多" onClick={() => setSheet('menu')}><MoreHorizontal /></Button></div>} />
 
       {floors.length > 1 && (
@@ -129,8 +130,9 @@ export function PlanPage() {
         {plan.outline.length < 3 && !plan.underlay && mode === 'outline' && (
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center px-4">
             <div className="pointer-events-auto max-w-sm rounded-xl border border-surface-border bg-surface/95 p-3 text-sm shadow-[var(--menu-shadow)] backdrop-blur">
-              <div className="font-medium">先建立外牆</div>
-              <p className="mt-1 text-xs text-muted-foreground">依序點擊每個轉角（順時針），或用其他方式：</p>
+              <div className="font-medium">還沒有平面圖</div>
+              <p className="mt-1 text-xs text-muted-foreground">最快的方式是用精靈，幾步就完成；這裡是進階的手繪與微調工具。</p>
+              <Button variant="brand" className="mt-2 w-full" onClick={() => nav('/plan/wizard')}><Sparkles />用精靈建立</Button>
               <div className="mt-2 grid grid-cols-3 gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => nav('/scan')}><ScanLine />掃描</Button>
                 <Button variant="outline" size="sm" onClick={() => { setMode('calibrate'); fileRef.current?.click() }}><ImageIcon />拍照描圖</Button>
@@ -247,6 +249,7 @@ export function PlanPage() {
             {sheet === 'menu' && (
               <div className="space-y-2 text-sm">
                 <div className="grid grid-cols-2 gap-2">
+                  <Button variant="brandSubtle" onClick={() => { setSheet('none'); nav('/plan/wizard') }}><Sparkles />用精靈重新建立</Button>
                   <Button variant="outline" onClick={() => { setSheet('none'); nav('/scan') }}><ScanLine />空間掃描</Button>
                   <Button variant="outline" onClick={() => { setSheet('none'); setMode('calibrate'); fileRef.current?.click() }}><ImageIcon />拍照描圖</Button>
                   <Button variant="outline" onClick={() => { addFloor({ copyOutline: true }); setMode('room'); setSheet('none') }}>新增樓層（複製外牆）</Button>

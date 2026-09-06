@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { emptyPlan, newId, type FloorPlan, type Item, type Room } from '../engine/floorplan'
 import type { Person } from '../engine/report'
+import type { RoomType } from '../engine/floorplan'
+import type { Corner, Shape, Wall } from '../engine/wizard'
 
 export interface Settings {
   /** apply magnetic declination to compass readings */
@@ -31,8 +33,29 @@ export interface HouseState {
   lunarMonth?: number
 }
 
+export interface WizardState {
+  step: number
+  widthM: number
+  depthM: number
+  shape: Shape
+  corner: Corner
+  notchWM: number
+  notchDM: number
+  doorWall: Wall
+  doorT: number
+  cols: number
+  rows: number
+  paint: Record<string, RoomType | undefined>
+  walls: Record<string, Wall | undefined>
+}
+
+const initialWizard: WizardState = { step: 0, widthM: 10, depthM: 8, shape: 'rect', corner: 'tr', notchWM: 3, notchDM: 2, doorWall: 'bottom', doorT: 0.5, cols: 4, rows: 4, paint: {}, walls: {} }
+
 interface AppState {
   persons: Person[]
+  wizard: WizardState
+  setWizard: (patch: Partial<WizardState>) => void
+  resetWizard: () => void
   house: HouseState
   /** 目前編輯中的樓層（= floors[activeFloor]） */
   plan: FloorPlan
@@ -81,6 +104,9 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       persons: [],
+      wizard: initialWizard,
+      setWizard: (patch) => set((s) => ({ wizard: { ...s.wizard, ...patch } })),
+      resetWizard: () => set({ wizard: initialWizard }),
       house: initialHouse,
       plan: emptyPlan(),
       floors: [emptyPlan()],
@@ -126,7 +152,7 @@ export const useAppStore = create<AppState>()(
       setEnvironment: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
       setEnvironmentOption: (key, value) => set((s) => ({ environment: { ...s.environment, [key]: value } })),
       setConsent: () => set({ consentedAt: new Date().toISOString() }),
-      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {}, consentedAt: undefined }),
+      resetAll: () => set({ persons: [], house: initialHouse, plan: emptyPlan(), floors: [emptyPlan()], activeFloor: 0, settings: initialSettings, environment: {}, consentedAt: undefined, wizard: initialWizard }),
     }),
     {
       name: 'dudu-fengshui-v1',
@@ -135,7 +161,7 @@ export const useAppStore = create<AppState>()(
         const raw = p.floors && p.floors.length ? p.floors : [p.plan ?? current.plan]
         const floors = raw.map((f, i) => ({ ...f, name: f.name ?? (i === 0 ? '1F' : `${i + 1}F`), level: f.level ?? i }))
         const activeFloor = Math.min(p.activeFloor ?? 0, floors.length - 1)
-        return { ...current, ...p, floors, activeFloor, plan: floors[activeFloor]!, house: { ...current.house, ...p.house }, settings: { ...current.settings, ...p.settings } }
+        return { ...current, ...p, floors, activeFloor, plan: floors[activeFloor]!, house: { ...current.house, ...p.house }, settings: { ...current.settings, ...p.settings }, wizard: { ...current.wizard, ...p.wizard } }
       },
     },
   ),

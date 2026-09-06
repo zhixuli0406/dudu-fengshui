@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage'
 import { SetupPage } from './pages/SetupPage'
 import { CompassPage } from './pages/CompassPage'
 import { PlanPage } from './pages/PlanPage'
+import { PlanWizardPage } from './pages/PlanWizardPage'
 import { ScanPage } from './pages/ScanPage'
 import { ReportPage } from './pages/ReportPage'
 import { EnvironmentPage } from './pages/EnvironmentPage'
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/compass" element={<CompassPage />} />
         <Route path="/plan" element={<PlanPage />} />
+        <Route path="/plan/wizard" element={<PlanWizardPage />} />
         <Route path="/scan" element={<ScanPage />} />
         <Route path="/report" element={<ReportPage />} />
         <Route path="/environment" element={<EnvironmentPage />} />

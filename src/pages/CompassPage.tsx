@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Camera, LocateFixed, Lock, Unlock } from 'lucide-react'
 import { CompassDial } from '../components/CompassDial'
 import { Page, PageHeader } from '../components/AppShell'
@@ -19,6 +19,8 @@ export function CompassPage() {
   const [locked, setLocked] = useState<number | null>(null)
   const [camera, setCamera] = useState(false)
   const nav = useNavigate()
+  const [params] = useSearchParams()
+  const returnTo = params.get('return') ?? '/setup'
 
   const trueHeading = useMemo(() => {
     if (compass.heading == null) return null
@@ -27,11 +29,11 @@ export function CompassPage() {
   const shown = locked ?? trueHeading
   const m = shown != null ? mountainOf(shown) : null
   const kw = shown != null ? kongwangOf(shown) : null
-  const useAsFacing = () => { if (shown == null) return; setHouse({ facingBearing: Math.round(shown * 10) / 10, facingSource: 'compass' }); nav('/setup') }
+  const useAsFacing = () => { if (shown == null) return; setHouse({ facingBearing: Math.round(shown * 10) / 10, facingSource: 'compass' }); nav(returnTo) }
 
   return (
     <>
-      <PageHeader title="羅盤量向" back="/setup" />
+      <PageHeader title="羅盤量向" back={returnTo} />
       <Page className="space-y-5">
         <p className="text-sm text-muted-foreground">手機平放、螢幕朝上，站在大門內側，機頂對準屋外。遠離金屬門框與電器 1 公尺以上；讀數飄動時以 8 字形晃動手機校正。</p>
 
