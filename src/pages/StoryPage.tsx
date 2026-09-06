@@ -89,7 +89,7 @@ export function StoryPage() {
 
       {/* cover: full-bleed illustration when available, else the rotating 3D house */}
       {!started && hasPlan && coverOk && (
-        <img src={coverSrc} alt="" onError={() => setCoverOk(false)} className="absolute inset-0 h-full w-full object-cover object-top" />
+        <img src={coverSrc} alt="" onError={() => setCoverOk(false)} className="absolute inset-0 h-full w-full object-cover object-[50%_70%]" />
       )}
       {!started && hasPlan && (
         <div className="relative z-10 flex flex-1 flex-col items-center justify-end p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] text-center">
