@@ -21,7 +21,7 @@ export function HomePage() {
     { to: '/setup', title: '家庭成員與房屋', desc: persons.length ? `${persons.length} 位成員，朝向 ${Math.round(house.facingBearing)}°` : '出生年、性別、建成年', done: persons.length > 0 && house.facingSource !== 'none', icon: Users },
     { to: '/plan', title: '平面圖', desc: hasPlan ? `${floors.length} 個樓層` : '掃描、拍照描圖或手繪', done: hasPlan, icon: LayoutGrid },
     { to: '/environment', title: '屋外環境', desc: Object.keys(environment).length ? `已答 ${Object.keys(environment).length} 題` : '路沖、壁刀、電塔等勾選', done: Object.keys(environment).length > 0, icon: Trees },
-    { to: '/report', title: '分析報告', desc: '八宅、飛星、流年、形勢', done: false, icon: FileText },
+    { to: '/report', title: '怎麼做', desc: '由簡到繁的處理建議，進階分析另附', done: false, icon: FileText },
   ]
   const next = steps.find((s) => !s.done) ?? steps[3]!
   return (

@@ -73,6 +73,10 @@ src/store/         zustand + localStorage 持久化
 
 `store.floors[]` 為各層 `FloorPlan`（`name`、`level`，0 = 主層），`plan` 永遠等於 `floors[activeFloor]`。各層以同一外牆原點繪製（新增樓層預設複製外牆）。`runAllFormRules(floors)` 對每層跑單層規則（標記樓層），再以 `crossFloorRules` 對相鄰層（level 差 1）做投影重疊判定（房間重疊率 ≥ 30% 以取樣估算；物件以旋轉矩形 AABB 重疊）。方位與飛星分析以 `mainFloor()`（含大門者，否則 level 0）為準。
 
+## 行動清單（一般使用者視角）
+
+`engine/advice.ts` 把報告轉成 `ActionItem[]`：形勢／外局 finding 的每條化解以關鍵字分級（`classifyRemedy`：裝修 > 搬動 > 小添購 > 免費），項目歸入最簡單那級並保留更徹底的做法；八宅凶方、有房間的流年煞方、凶飛星組合另產生項目。`PLAIN` 表把規則 id 翻成白話標題與一句原因。`plainSummary` 產生摘要段落。
+
 ## 分享圖
 
 `src/share/shareCard.ts` 以字串組出 SVG：`buildShareSvg` 為 1080×1350 單層分享卡，`buildReportSvg` 為高度依內容伸縮的完整報告長圖（共用 `drawPlan`），`svgToPng` 用 `<img>`＋canvas 轉 PNG（2×，總像素上限 1,600 萬以符合 iOS canvas 限制），`shareOrDownload` 優先 Web Share（files），否則下載。只用系統字型，SVG 作為圖片繪入 canvas 時才能正確顯示中文。

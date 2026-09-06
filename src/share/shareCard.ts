@@ -7,6 +7,7 @@ import { NINE_STARS, RATING_ZH } from '../engine/stars'
 import { runFormRules } from '../engine/rules'
 import { groupZh } from '../engine/bazhai'
 import { palaceLabel } from '../engine/annual'
+import { buildActions, EFFORT_ORDER, EFFORT_ZH, groupByEffort, plainSummary } from '../engine/advice'
 
 export type ShareKind = 'palace' | 'bazhai' | 'stars' | 'annual' | 'form'
 export const SHARE_KIND_ZH: Record<ShareKind, string> = { palace: '方位九宮', bazhai: '八宅遊星', stars: '玄空飛星', annual: '流年飛星', form: '形勢問題' }
@@ -206,10 +207,18 @@ export function buildReportSvg({ plan, report, siteUrl = 'zhixuli0406.github.io/
   drawPlan(parts, plan, report, kind, 60, y, W - 120, 640)
   y += 640
 
-  // top actions
-  section('優先處理')
-  if (!report.topActions.length) para('目前沒有高優先問題。', 26, 38, C.muted)
-  report.topActions.forEach((a, i) => para(`${i + 1}. ${a}`))
+  // plain summary + graded action list (一般使用者視角)
+  const actions = buildActions(report)
+  section('怎麼做')
+  para(plainSummary(report, actions), 26, 38)
+  const groups = groupByEffort(actions)
+  for (const e of EFFORT_ORDER) {
+    const items = groups[e]
+    if (!items.length) continue
+    y += 34; text(`${EFFORT_ZH[e]}（${items.length}）`, 60, 28, { weight: 500, fill: C.brand })
+    for (const a of items.slice(0, 6)) para(`・${a.title}${a.where ? `（${a.where}）` : ''}：${a.how[0]!.text}`, 24, 42)
+    if (items.length > 6) para(`…另有 ${items.length - 6} 項，見網頁版。`, 22, 42, C.muted)
+  }
 
   // persons
   section('成員命卦')

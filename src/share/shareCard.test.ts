@@ -24,7 +24,7 @@ describe('share card', () => {
   it('full report image contains every section', () => {
     const { svg, height } = buildReportSvg({ kind: 'annual', plan, report })
     expect(height).toBeGreaterThan(2000)
-    for (const t of ['嘟嘟風水分析報告', '優先處理', '成員命卦', '飛星盤', '流年', '形勢問題', '阿明']) expect(svg).toContain(t)
+    for (const t of ['嘟嘟風水分析報告', '怎麼做', '今天就能做', '成員命卦', '飛星盤', '流年', '形勢問題', '阿明']) expect(svg).toContain(t)
     expect(svg.endsWith('</svg>')).toBe(true)
   })
   it('escapes text', () => {

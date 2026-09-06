@@ -16,6 +16,8 @@ import { ROOM_ZH, mainFloor } from '../engine/floorplan'
 import { SEVERITY_ZH } from '../engine/rules'
 import { reportToMarkdown } from '../engine/exportMarkdown'
 import { environmentFindings, type EnvironmentQuestion } from '../engine/environment'
+import { buildActions, plainSummary } from '../engine/advice'
+import { ActionList } from '../components/ActionList'
 import envQuestions from '../data/environmentQuestions.json'
 import { cn } from '../lib/utils'
 
@@ -23,6 +25,7 @@ type Tab = 'summary' | 'bazhai' | 'xuankong' | 'annual' | 'form' | 'element'
 
 export function ReportPage() {
   const { persons, house, plan, floors, environment } = useAppStore()
+  const [view, setView] = useState<'simple' | 'advanced'>('simple')
   const [tab, setTab] = useState<Tab>('summary')
   const [share, setShare] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -42,6 +45,7 @@ export function ReportPage() {
     } catch (e) { console.error(e); return null }
   }, [persons, house, plan, floors, environment])
 
+  const actions = useMemo(() => (report ? buildActions(report) : []), [report])
   if (!report) return <Page><Empty tone="destructive" title="無法產生報告" description="請確認資料頁的設定。" /></Page>
   const missing: { text: string; to: string }[] = []
   if (persons.length === 0) missing.push({ text: '尚未新增家庭成員，八宅命卦會是空的', to: '/setup' })
@@ -76,6 +80,18 @@ export function ReportPage() {
           </ul>
         )}
 
+        <Segmented value={view} onValueChange={setView} className="w-full" size="lg" options={[{ value: 'simple', label: '怎麼做' }, { value: 'advanced', label: '進階分析' }]} />
+
+        {view === 'simple' && (<>
+          <section>
+            <p className="text-base leading-relaxed">{plainSummary(report, actions)}</p>
+            <p className="mt-2 text-xs text-muted-foreground">下面依處理難度由簡到繁排列，每項先給最簡單的做法，展開可看更徹底的方式。</p>
+          </section>
+          {actions.length === 0 ? <Empty variant="dashed" title="目前沒有需要處理的事" description="放上門、床、灶等物件並填屋外環境後，這裡會列出具體做法。" /> : <ActionList actions={actions} />}
+          <p className="text-xs text-muted-foreground">想看分數、飛星盤與各派細節，切到「進階分析」。</p>
+        </>)}
+
+        {view === 'advanced' && (<>
         <section className="rounded-xl border border-surface-border bg-surface p-4">
           <div className="flex items-end gap-4">
             <div>
@@ -232,6 +248,7 @@ export function ReportPage() {
             ))}
           </ul>
         )}
+        </>)}
         <p className="text-xs text-muted-foreground">本報告為文化參考，各派理論互有出入；重大裝修請諮詢專業人士。<Link to="/privacy" className="underline underline-offset-2">免責聲明</Link>。需要文字版可<button className="underline underline-offset-2" onClick={downloadMarkdown}>下載 Markdown</button>。</p>
       </Page>
     </>
