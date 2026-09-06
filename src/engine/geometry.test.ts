@@ -26,6 +26,12 @@ describe('geometry', () => {
     // a line from outside crossing the polygon
     expect(segmentCrossesPolygonEdges({ a: { x: -50, y: 50 }, b: { x: 150, y: 50 } }, sq)).toBe(true)
   })
+  it('rect corners use facing when rotation is absent (items)', () => {
+    const c = rectCorners({ x: 0, y: 0, w: 200, h: 100, facing: 90 })
+    const xs = c.map((p) => p.x), ys = c.map((p) => p.y)
+    expect(Math.round(Math.max(...xs) - Math.min(...xs))).toBe(100)
+    expect(Math.round(Math.max(...ys) - Math.min(...ys))).toBe(200)
+  })
   it('rect corners rotated', () => {
     const c = rectCorners({ x: 0, y: 0, w: 10, h: 10, rotation: 90 })
     expect(Math.round(c[0]!.x)).toBe(10); expect(Math.abs(Math.round(c[0]!.y))).toBe(0)

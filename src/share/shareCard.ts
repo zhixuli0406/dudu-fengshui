@@ -2,6 +2,7 @@ import { PALACES, TRIGRAMS_CLOCKWISE, type Trigram } from '../engine/bagua'
 import { WANDERING_STARS } from '../engine/bazhai'
 import { ITEM_ZH, ROOM_ZH, type FloorPlan } from '../engine/floorplan'
 import { bbox, polygonCentroid, rectCorners, type Point } from '../engine/geometry'
+import { palaceAnchors } from '../engine/palaces'
 import type { Report } from '../engine/report'
 import { NINE_STARS, RATING_ZH } from '../engine/stars'
 import { runFormRules } from '../engine/rules'
@@ -103,11 +104,8 @@ function drawPlan(parts: string[], plan: FloorPlan, report: Report, kind: ShareK
   const outline = plan.outline.length >= 3 ? plan.outline : fallbackOutline(plan)
   const b = bbox(outline)
   const pad = 90
-  let scale = Math.min((AW - pad * 2) / Math.max(1, b.maxX - b.minX), (AH - pad * 2) / Math.max(1, b.maxY - b.minY))
-  // the overlay circle (radius ≈ half diagonal × 1.12 for the north label) must stay inside the box
-  const diag = Math.hypot(b.maxX - b.minX, b.maxY - b.minY) / 2
-  const maxR = Math.min(AW, AH) / 2 - 36
-  if (diag * scale * 1.12 > maxR) scale = maxR / (diag * 1.12)
+  // sectors are clipped to the outline, so only the house itself (plus the north label) needs to fit
+  const scale = Math.min((AW - pad * 2) / Math.max(1, b.maxX - b.minX), (AH - pad * 2) / Math.max(1, b.maxY - b.minY))
   const ox = AX + (AW - (b.maxX - b.minX) * scale) / 2 - b.minX * scale
   const oy = AY + (AH - (b.maxY - b.minY) * scale) / 2 - b.minY * scale
   const P = (p: Point) => `${(ox + p.x * scale).toFixed(1)},${(oy + p.y * scale).toFixed(1)}`
@@ -125,21 +123,38 @@ function drawPlan(parts: string[], plan: FloorPlan, report: Report, kind: ShareK
   }
   parts.push(`<polygon points="${outline.map(P).join(' ')}" fill="none" stroke="${C.ink}" stroke-width="4" stroke-linejoin="round"/>`)
 
+  const clipId = `clip-${Math.round(AX)}-${Math.round(AY)}`
+  parts.push(`<defs><clipPath id="${clipId}"><polygon points="${outline.map(P).join(' ')}"/></clipPath></defs>`)
+  const anchors = palaceAnchors(outline, plan.northOffset)
+  const A = (t: Trigram) => ({ x: X(anchors[t].x), y: Y(anchors[t].y), small: anchors[t].n < 12 })
   if (kind !== 'form') {
     const info = palaceInfo(report, kind)
+    parts.push(`<g clip-path="url(#${clipId})">`)
     for (const t of TRIGRAMS_CLOCKWISE) {
       const a0 = PALACES[t].bearing - 22.5 - plan.northOffset, a1 = PALACES[t].bearing + 22.5 - plan.northOffset
-      const p0 = polar({ x: cx, y: cy }, R, a0), p1 = polar({ x: cx, y: cy }, R, a1)
+      const RR = R * 1.5
+      const p0 = polar({ x: cx, y: cy }, RR, a0), p1 = polar({ x: cx, y: cy }, RR, a1)
       const i = info[t]
       const fill = i.tone === 'good' ? C.good : i.tone === 'bad' ? C.badFill : C.neutral
-      parts.push(`<path d="M ${cx} ${cy} L ${p0.x} ${p0.y} A ${R} ${R} 0 0 1 ${p1.x} ${p1.y} Z" fill="${fill}" stroke="${C.muted}" stroke-opacity="0.5" stroke-dasharray="8 6" stroke-width="1.5"/>`)
-      const mid = polar({ x: cx, y: cy }, R * 0.74, (a0 + a1) / 2)
-      parts.push(`<text x="${mid.x}" y="${mid.y}" font-size="${fs}" font-weight="500" fill="${C.ink}" text-anchor="middle">${esc(PALACES[t].zh)}·${esc(PALACES[t].direction)}</text>`)
-      i.lines.forEach((l, k) => parts.push(`<text x="${mid.x}" y="${mid.y + fs * (1.2 + k * 1.05)}" font-size="${fs * 0.9}" fill="${i.tone === 'bad' ? C.bad : i.tone === 'good' ? C.brand : C.muted}" text-anchor="middle">${esc(l)}</text>`))
+      parts.push(`<path d="M ${cx} ${cy} L ${p0.x} ${p0.y} A ${RR} ${RR} 0 0 1 ${p1.x} ${p1.y} Z" fill="${fill}" stroke="${C.muted}" stroke-opacity="0.5" stroke-dasharray="8 6" stroke-width="1.5"/>`)
     }
-    const n = polar({ x: cx, y: cy }, R * 1.06, -plan.northOffset)
-    parts.push(`<line x1="${cx}" y1="${cy}" x2="${n.x}" y2="${n.y}" stroke="${C.bad}" stroke-opacity="0.6" stroke-width="2"/><text x="${n.x}" y="${n.y - 8}" font-size="${fs}" fill="${C.bad}" text-anchor="middle">N</text>`)
+    parts.push('</g>')
+    for (const t of TRIGRAMS_CLOCKWISE) {
+      const i = info[t]
+      const m = A(t)
+      const f = m.small ? fs * 0.8 : fs
+      parts.push(`<text x="${m.x}" y="${m.y}" font-size="${f}" font-weight="500" fill="${C.ink}" text-anchor="middle">${m.small ? esc(PALACES[t].direction) : `${esc(PALACES[t].zh)}·${esc(PALACES[t].direction)}`}</text>`)
+      i.lines.forEach((l, k) => parts.push(`<text x="${m.x}" y="${m.y + f * (1.2 + k * 1.05)}" font-size="${f * 0.9}" fill="${i.tone === 'bad' ? C.bad : i.tone === 'good' ? C.brand : C.muted}" text-anchor="middle">${esc(l)}</text>`))
+    }
+    // north arrow: from the centre to just outside the house edge along north
+    const edge = outlineHit(outline, center, -plan.northOffset)
+    const n0 = { x: X(edge.x), y: Y(edge.y) }
+    const dir = { x: n0.x - cx, y: n0.y - cy }
+    const len = Math.hypot(dir.x, dir.y) || 1
+    const n = { x: n0.x + (dir.x / len) * fs * 1.6, y: n0.y + (dir.y / len) * fs * 1.6 }
+    parts.push(`<line x1="${cx}" y1="${cy}" x2="${n0.x}" y2="${n0.y}" stroke="${C.bad}" stroke-opacity="0.6" stroke-width="2"/><text x="${n.x}" y="${n.y + fs * 0.35}" font-size="${fs}" fill="${C.bad}" text-anchor="middle">N</text>`)
   }
+
   for (const it of plan.items) {
     const corners = rectCorners(it).map(P).join(' ')
     parts.push(`<polygon points="${corners}" fill="${C.surface}" stroke="${C.ink}" stroke-width="1.5" opacity="0.9"/>`)
@@ -161,7 +176,9 @@ function drawPlan(parts: string[], plan: FloorPlan, report: Report, kind: ShareK
   const perPalace = new Map<Trigram, string[]>()
   for (const g of tags) perPalace.set(g.t, [...(perPalace.get(g.t) ?? []), g.label])
   for (const [t, labels] of perPalace) {
-    const mid = polar({ x: cx, y: cy }, R * 0.56, PALACES[t].bearing - plan.northOffset)
+    const base = A(t)
+    const lines = kind !== 'form' ? palaceInfo(report, kind)[t].lines.length : 0
+    const mid = { x: base.x, y: base.y + fs * (1.2 + lines * 1.05) + fs * 0.6 }
     const tw = labels.length * fs * 2.1 + fs * 0.6
     parts.push(`<rect x="${mid.x - tw / 2}" y="${mid.y - fs * 0.8}" width="${tw}" height="${fs * 1.5}" rx="${fs * 0.75}" fill="${C.surface}" stroke="${C.line}" stroke-width="1.5" opacity="0.95"/>`)
     labels.forEach((l, i) => {
@@ -270,6 +287,23 @@ export function buildReportSvg({ plan, report, siteUrl = 'zhixuli0406.github.io/
   const height = Math.ceil(y)
   const head = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${height}" viewBox="0 0 ${W} ${height}" font-family="${FONT}"><rect width="${W}" height="${height}" fill="${C.bg}"/>`
   return { svg: head + parts.join('') + '</svg>', height }
+}
+
+/** Point where a ray from `from` at screen angle `deg` (0 = up, clockwise) leaves the polygon. */
+function outlineHit(poly: Point[], from: Point, deg: number): Point {
+  const r = (deg * Math.PI) / 180
+  const d = { x: Math.sin(r), y: -Math.cos(r) }
+  let best: { t: number; p: Point } | null = null
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!, b = poly[(i + 1) % poly.length]!
+    const ex = b.x - a.x, ey = b.y - a.y
+    const den = d.x * ey - d.y * ex
+    if (Math.abs(den) < 1e-9) continue
+    const t = ((a.x - from.x) * ey - (a.y - from.y) * ex) / den
+    const u = ((a.x - from.x) * d.y - (a.y - from.y) * d.x) / den
+    if (t > 0 && u >= 0 && u <= 1 && (!best || t < best.t)) best = { t, p: { x: from.x + d.x * t, y: from.y + d.y * t } }
+  }
+  return best?.p ?? from
 }
 
 function fallbackOutline(plan: FloorPlan): Point[] {

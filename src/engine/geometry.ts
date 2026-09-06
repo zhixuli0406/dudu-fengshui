@@ -1,5 +1,5 @@
 export interface Point { x: number; y: number }
-export interface Rect { x: number; y: number; w: number; h: number; rotation?: number }
+export interface Rect { x: number; y: number; w: number; h: number; rotation?: number; /** items store their rotation as `facing` */ facing?: number }
 export interface Segment { a: Point; b: Point }
 
 export function dist(a: Point, b: Point): number {
@@ -50,10 +50,10 @@ export function rectCenter(r: Rect): Point {
   return { x: r.x + r.w / 2, y: r.y + r.h / 2 }
 }
 
-/** Corner points of a (possibly rotated about its centre) rectangle. */
+/** Corner points of a rectangle rotated about its centre by `rotation` (or an item's `facing`). */
 export function rectCorners(r: Rect): Point[] {
   const c = rectCenter(r)
-  const rot = ((r.rotation ?? 0) * Math.PI) / 180
+  const rot = ((r.rotation ?? r.facing ?? 0) * Math.PI) / 180
   const hw = r.w / 2, hh = r.h / 2
   const pts = [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }]
   return pts.map((p) => ({ x: c.x + p.x * Math.cos(rot) - p.y * Math.sin(rot), y: c.y + p.x * Math.sin(rot) + p.y * Math.cos(rot) }))

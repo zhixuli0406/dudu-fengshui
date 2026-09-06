@@ -237,7 +237,7 @@ export function PlanEditor(props: EditorProps) {
         </g>
       )}
       {/* overlay */}
-      {overlay !== 'none' && plan.outline.length >= 3 && <NineGridOverlay center={center} radius={radius} northOffset={plan.northOffset} style={overlay} bounds={bounds} info={overlayInfo} fontSize={fontSize} />}
+      {overlay !== 'none' && plan.outline.length >= 3 && <NineGridOverlay center={center} radius={radius} northOffset={plan.northOffset} style={overlay} bounds={bounds} info={overlayInfo} fontSize={fontSize} outline={plan.outline} />}
       {/* items */}
       {plan.items.map((i) => {
         const cx = i.x + i.w / 2, cy = i.y + i.h / 2

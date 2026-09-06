@@ -1,5 +1,6 @@
 import { PALACES, TRIGRAMS_CLOCKWISE, type Trigram } from '../engine/bagua'
 import type { Point } from '../engine/geometry'
+import { palaceAnchors } from '../engine/palaces'
 
 export interface PalaceOverlayInfo {
   /** up to 3 short lines drawn in the sector */
@@ -10,6 +11,8 @@ export interface PalaceOverlayInfo {
 interface Props {
   center: Point
   radius: number
+  /** house outline; sector fills are clipped to it and labels anchored inside it */
+  outline?: Point[]
   northOffset: number
   style: 'pie' | 'grid'
   bounds?: { minX: number; minY: number; maxX: number; maxY: number }
@@ -20,7 +23,7 @@ interface Props {
 const toneColor = { good: 'color-mix(in oklch, var(--brand) 18%, transparent)', bad: 'color-mix(in oklch, var(--destructive) 18%, transparent)', neutral: 'color-mix(in oklch, var(--muted-foreground) 8%, transparent)' }
 
 /** 8 palace sectors (or a 3×3 grid) drawn around the plan centre, rotated by northOffset. */
-export function NineGridOverlay({ center, radius, northOffset, style, bounds, info, fontSize }: Props) {
+export function NineGridOverlay({ center, radius, northOffset, style, bounds, info, fontSize, outline }: Props) {
   if (style === 'grid' && bounds) {
     const w = bounds.maxX - bounds.minX, h = bounds.maxY - bounds.minY
     const cells: { t: Trigram | 'center'; c: number; r: number }[] = []
@@ -43,18 +46,28 @@ export function NineGridOverlay({ center, radius, northOffset, style, bounds, in
     )
   }
   const R = radius
+  const hasOutline = !!outline && outline.length >= 3
+  const anchors = hasOutline ? palaceAnchors(outline!, northOffset) : null
+  const clipId = `palace-clip-${Math.round(center.x)}-${Math.round(center.y)}`
   return (
     <g pointerEvents="none">
+      {hasOutline && <defs><clipPath id={clipId}><polygon points={outline!.map((p) => `${p.x},${p.y}`).join(' ')} /></clipPath></defs>}
+      <g clipPath={hasOutline ? `url(#${clipId})` : undefined}>
+        {TRIGRAMS_CLOCKWISE.map((t) => {
+          const a0 = PALACES[t].bearing - 22.5 - northOffset
+          const a1 = PALACES[t].bearing + 22.5 - northOffset
+          const p0 = polar(center, R * 1.5, a0), p1 = polar(center, R * 1.5, a1)
+          const i = info?.[t]
+          return <path key={t} d={`M ${center.x} ${center.y} L ${p0.x} ${p0.y} A ${R * 1.5} ${R * 1.5} 0 0 1 ${p1.x} ${p1.y} Z`} fill={i?.tone ? toneColor[i.tone] : 'transparent'} stroke="var(--muted-foreground)" strokeOpacity={0.45} strokeDasharray="6 4" strokeWidth={fontSize / 10} />
+        })}
+      </g>
       {TRIGRAMS_CLOCKWISE.map((t) => {
-        const a0 = PALACES[t].bearing - 22.5 - northOffset
-        const a1 = PALACES[t].bearing + 22.5 - northOffset
-        const p0 = polar(center, R, a0), p1 = polar(center, R, a1)
         const i = info?.[t]
-        const mid = polar(center, R * 0.72, (a0 + a1) / 2)
+        const mid = anchors ? anchors[t] : polar(center, R * 0.72, PALACES[t].bearing - northOffset)
+        const small = anchors ? anchors[t].n < 12 : false
         return (
           <g key={t}>
-            <path d={`M ${center.x} ${center.y} L ${p0.x} ${p0.y} A ${R} ${R} 0 0 1 ${p1.x} ${p1.y} Z`} fill={i?.tone ? toneColor[i.tone] : 'transparent'} stroke="var(--muted-foreground)" strokeOpacity={0.45} strokeDasharray="6 4" strokeWidth={fontSize / 10} />
-            <text x={mid.x} y={mid.y} textAnchor="middle" fontSize={fontSize} fill="var(--foreground)" fontWeight={500}>{PALACES[t].zh}·{PALACES[t].direction}</text>
+            <text x={mid.x} y={mid.y} textAnchor="middle" fontSize={small ? fontSize * 0.8 : fontSize} fill="var(--foreground)" fontWeight={500}>{small ? PALACES[t].direction : `${PALACES[t].zh}·${PALACES[t].direction}`}</text>
             {i?.lines.map((l, k) => <text key={k} x={mid.x} y={mid.y + fontSize * (1.15 + k * 1.05)} textAnchor="middle" fontSize={fontSize * 0.8} fill="var(--foreground)" opacity={0.75}>{l}</text>)}
           </g>
         )
