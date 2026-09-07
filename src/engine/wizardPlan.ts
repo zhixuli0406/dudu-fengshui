@@ -82,9 +82,6 @@ export function finalizeWizardPlan(d: DerivedPlan): FloorPlan {
   }
 }
 
-/** Wall names as seen from the main door looking in (door on the bottom wall of the sketch). */
-export const WALL_FROM_DOOR: Record<Wall, string> = { top: '裡面那面牆', bottom: '大門那一面', left: '左手邊那面牆', right: '右手邊那面牆' }
-
 /** Compass bearing a wall of the sketch lies toward; `northOffset` is the bearing the top of the sketch points to. */
 export function wallBearing(wall: Wall, northOffset: number): number {
   const turn: Record<Wall, number> = { top: 0, right: 90, bottom: 180, left: 270 }

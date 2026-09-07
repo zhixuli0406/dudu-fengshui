@@ -34,6 +34,13 @@ describe('師傅來看房 flow (sketch path, two floors)', () => {
     for (let i = 0; i < 8 && !screen.queryByRole('button', { name }); i++) act(() => { fireEvent.click(container.querySelector('main .select-none')!) })
     expect(screen.getByRole('button', { name })).toBeTruthy()
   }
+  /** tap the room sketch at plan coordinates (jsdom has no layout, so client coords map 1:1 onto the viewBox) */
+  const tapRoom = (container: HTMLElement, x: number, y: number) => {
+    const svg = container.querySelector('main svg[data-vb]')!
+    const [vx, vy] = svg.getAttribute('data-vb')!.split(' ').map(Number)
+    act(() => { fireEvent.pointerDown(svg, { clientX: x - vx!, clientY: y - vy! }) })
+    click(/牆，就這樣$/)
+  }
   const paint = (container: HTMLElement, brush: string, cells: number[]) => {
     click(brush)
     const rects = container.querySelectorAll('main svg rect.cursor-pointer')
@@ -81,12 +88,12 @@ describe('師傅來看房 flow (sketch path, two floors)', () => {
 
     // 7 walls + verdicts on floor 1
     expect(screen.getByText('床頭靠哪面牆？')).toBeTruthy()
-    click(/裡面那面牆/)
+    tapRoom(container, 250, 20) // master bedroom spans x 0–500, y 0–200: near its top wall
     tick()
     tapUntil(container, '下一間')
     click('下一間')
     expect(screen.getByText('爐灶靠哪面牆？')).toBeTruthy()
-    click(/右手邊那面牆/)
+    tapRoom(container, 990, 700) // kitchen spans x 750–1000, y 600–800: near its right wall
     tick()
     tapUntil(container, '這層看完了')
     const f0b = useAppStore.getState().floors[0]!

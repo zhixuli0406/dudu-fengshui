@@ -10,7 +10,7 @@ import { palaceLabel } from '../engine/annual'
 import { emptyPlan, newId, ROOM_ZH, type FloorPlan } from '../engine/floorplan'
 import { periodOfYear } from '../engine/xuankong'
 import { buildActions } from '../engine/advice'
-import { keyItemFor, placeAgainstWall } from '../engine/wizard'
+import { keyItemFor } from '../engine/wizard'
 import { deriveWizardPlan, ITEM_WHY } from '../engine/wizardPlan'
 import { DOOR_STAND, floorName, HOME_TYPES, homeTypeInfo, type HomeType } from '../engine/homeTypes'
 import { buildChapters } from '../story/chapters'
@@ -18,7 +18,7 @@ import { detectAR, openInLaunchViewer, type ARCapability } from '../ar/providers
 import { BUILT_CHOICES, firstStep, floorSource, isStepId, nextStep, prevStep, progressOf, roomStops, type GuideCtx, type Move, type StepId } from '../guide/script'
 import { Escape, Scene, choiceCls } from '../guide/Scene'
 import { DoorCompass } from '../guide/DoorCompass'
-import { PaintStep, SizeStep, WallStep } from '../guide/PlanSteps'
+import { PaintStep, RoomTapStep, SizeStep } from '../guide/PlanSteps'
 import { WalkStep, arUsable } from '../guide/WalkStep'
 import { PalaceRose, type RoseTone } from '../guide/PalaceRose'
 import { cn } from '../lib/utils'
@@ -237,9 +237,9 @@ export function StartPage() {
     if (key) {
       body = (
         <Ask kicker={`站在${fName}的${ROOM_ZH[pendingRoom.type]}裡`} ask={key.question} why={ITEM_WHY[key.item]}>
-          <WallStep room={pendingRoom} plan={floorPlan} onSkip={() => move(nextStep('furniture', ctx))}
-            onPick={(wall) => {
-              const placed = { ...placeAgainstWall(pendingRoom, key.item, wall), id: newId('i') }
+          <RoomTapStep room={pendingRoom} plan={floorPlan} itemType={key.item} onSkip={() => move(nextStep('furniture', ctx))}
+            onPlace={(item) => {
+              const placed = { ...item, id: newId('i') }
               const others = floorPlan.items.filter((i) => !(i.roomId === pendingRoom.id && i.type === key.item))
               const next = saveFloor(floorIdx, { ...floorPlan, items: [...others, placed] })
               later(nextStep('furniture', ctxWith(next)))
