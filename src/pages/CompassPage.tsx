@@ -20,7 +20,7 @@ export function CompassPage() {
   const [camera, setCamera] = useState(false)
   const nav = useNavigate()
   const [params] = useSearchParams()
-  const returnTo = params.get('return') ?? '/setup'
+  const returnTo = params.get('return') ?? '/report'
 
   const trueHeading = useMemo(() => {
     if (compass.heading == null) return null

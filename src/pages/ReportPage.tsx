@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ChevronRight, Download, Share2 } from 'lucide-react'
 import { MasterAvatar } from '../components/MasterAvatar'
 import { ShareSheet } from '../components/ShareSheet'
 import { buildReportSvg, shareOrDownload, svgToPng } from '../share/shareCard'
 import { Page, PageHeader } from '../components/AppShell'
-import { Badge, Button, Empty, Segmented } from '../components/mds'
+import { Badge, Button, Empty, Field, Input, NativeSelect, Segmented } from '../components/mds'
 import { resolveAnalysisPlan, useAppStore } from '../store/useAppStore'
 import { buildReport, type Report } from '../engine/report'
 import { PALACES, TRIGRAMS_CLOCKWISE, type Trigram } from '../engine/bagua'
@@ -25,13 +25,15 @@ import { cn } from '../lib/utils'
 type Tab = 'summary' | 'bazhai' | 'xuankong' | 'annual' | 'form' | 'element'
 
 export function ReportPage() {
-  const { persons, house, plan, floors, environment, lite } = useAppStore()
+  const { persons, house, setHouse, plan, floors, environment, lite, setLite } = useAppStore()
   const resolved = useMemo(() => resolveAnalysisPlan(floors, plan, house, lite), [floors, plan, house, lite])
   const [view, setView] = useState<'simple' | 'advanced'>('simple')
   const [tab, setTab] = useState<Tab>('summary')
   const [share, setShare] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [dlMsg, setDlMsg] = useState<string | null>(null)
+  const nav = useNavigate()
+  const guide = (stepId: 'owner' | 'door' | 'build') => { setLite({ stepId, pendingId: undefined, floorIdx: 0 }); nav('/start') }
   const report = useMemo<Report | null>(() => {
     try {
       const r = buildReport(persons, { facingBearing: house.facingBearing, periodYear: house.periodYear, plan: resolved.plan, floors: resolved.floors, stoveMode: house.stoveMode, jianxiangTolerance: house.jianxiangTolerance, replacementMode: house.replacementMode })
@@ -48,11 +50,11 @@ export function ReportPage() {
 
   const actions = useMemo(() => (report ? buildActions(report) : []), [report])
   if (!report) return <Page><Empty tone="destructive" title="無法產生報告" description="請確認資料頁的設定。" /></Page>
-  const missing: { text: string; to: string }[] = []
-  if (persons.length === 0) missing.push({ text: '尚未新增家庭成員，八宅命卦會是空的', to: '/setup' })
-  if (house.facingSource === 'none') missing.push({ text: `尚未量測朝向，目前用預設 ${house.facingBearing}°`, to: '/compass' })
-  if (resolved.synthetic) missing.push({ text: lite.rooms.length ? '目前用方位示意圖分析；畫出平面圖可再看門沖、樑壓等形勢問題' : '還沒有房間資料，先跟師傅走一遍或畫平面圖', to: lite.rooms.length ? '/plan/wizard' : '/start' })
-  if (Object.keys(environment).length === 0) missing.push({ text: '尚未填寫屋外環境', to: '/environment' })
+  const missing: { text: string; go: () => void }[] = []
+  if (persons.length === 0) missing.push({ text: '還沒說誰當家，命卦會是空的', go: () => guide('owner') })
+  if (house.facingSource === 'none') missing.push({ text: `還沒量大門朝向，目前用預設 ${house.facingBearing}°`, go: () => guide('door') })
+  if (resolved.synthetic) missing.push({ text: '還沒有房間，門沖、樑壓這些看不到；跟師傅走一圈或畫個大概', go: () => guide('build') })
+  if (Object.keys(environment).length === 0) missing.push({ text: '還沒填屋外環境（路沖、壁刀…）', go: () => nav('/environment') })
 
   const downloadMarkdown = () => {
     const blob = new Blob([reportToMarkdown(report)], { type: 'text/markdown;charset=utf-8' })
@@ -77,7 +79,7 @@ export function ReportPage() {
         {dlMsg && <p className="text-xs text-muted-foreground">{dlMsg}</p>}
         {missing.length > 0 && (
           <ul className="space-y-1 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
-            {missing.map((m) => <li key={m.to} className="flex items-center justify-between gap-2">{m.text}<Link to={m.to} className="shrink-0 text-brand underline underline-offset-2">去補</Link></li>)}
+            {missing.map((m) => <li key={m.text} className="flex items-center justify-between gap-2">{m.text}<button onClick={m.go} className="shrink-0 text-brand underline underline-offset-2">去補</button></li>)}
           </ul>
         )}
 
@@ -118,6 +120,37 @@ export function ReportPage() {
           </dl>
           {report.house.kongwang && <p className="mt-2 text-xs text-destructive">朝向落在{report.house.kongwang === 'major' ? '大空亡' : '小空亡'}線，建議重新量測。</p>}
           {report.house.jianxiang && <p className="mt-2 text-xs text-muted-foreground">兼向：偏離{report.house.facing.name}山中心 {report.xuankong.chart.jianxiangOffset}°（門檻 {house.jianxiangTolerance}°）。{report.xuankong.chart.replacement ? '已改用替卦起星，替卦星辰不固，效果不若下卦穩定。' : '目前以下卦排盤，結果僅供參考。'}</p>}
+          <details className="mt-3 rounded-lg border border-surface-border">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-medium">判法設定（各派有別）</summary>
+            <div className="grid gap-3 border-t border-surface-border px-3 py-3 sm:grid-cols-2">
+              <Field label="朝向（度）" hint="0 北、90 東、180 南、270 西；量得不準可微調">
+                <Input type="number" min={0} max={359} value={Math.round(house.facingBearing)} onChange={(e) => setHouse({ facingBearing: ((Number(e.target.value) % 360) + 360) % 360, facingSource: 'manual' })} />
+              </Field>
+              <Field label="建成年" hint="大幅翻修可改填翻修年">
+                <Input type="number" value={house.periodYear} onChange={(e) => setHouse({ periodYear: Number(e.target.value) || house.periodYear })} />
+              </Field>
+              <Field label="取向依據" hint="門為氣口是各派共同承認的基礎，預設自家大門">
+                <NativeSelect value={house.facingBasis} onChange={(e) => setHouse({ facingBasis: e.target.value as typeof house.facingBasis })}>
+                  <option value="unitDoor">自家大門朝向</option><option value="balcony">陽台或最大採光面</option><option value="buildingDoor">整棟大樓正門</option>
+                </NativeSelect>
+              </Field>
+              <Field label="灶位判法" hint="「座凶向吉」坊間廣傳但古籍出處未驗證">
+                <NativeSelect value={house.stoveMode} onChange={(e) => setHouse({ stoveMode: e.target.value as typeof house.stoveMode })}>
+                  <option value="allGood">灶座與灶口皆宜吉方</option><option value="seatBadFaceGood">灶座壓凶方、灶口向吉方</option>
+                </NativeSelect>
+              </Field>
+              <Field label="兼向門檻" hint="偏離山中心超過此角度即為兼向">
+                <NativeSelect value={house.jianxiangTolerance} onChange={(e) => setHouse({ jianxiangTolerance: Number(e.target.value) })}>
+                  <option value={3.5}>3.5°（玄空館）</option><option value={4.5}>4.5°（沈氏，預設）</option><option value={6}>6°（高端風水網）</option>
+                </NativeSelect>
+              </Field>
+              <Field label="兼向時排盤" hint="替卦採傳統蔣大鴻／沈氏替星表">
+                <NativeSelect value={house.replacementMode} onChange={(e) => setHouse({ replacementMode: e.target.value as typeof house.replacementMode })}>
+                  <option value="auto">自動改用替卦起星</option><option value="never">一律下卦，僅提示</option>
+                </NativeSelect>
+              </Field>
+            </div>
+          </details>
           {report.xuankong.chart.qixing && <p className="mt-2 text-xs text-muted-foreground">{report.xuankong.chart.qixing.kind}（{report.xuankong.chart.qixing.group} 三般卦），進階格局，生效以巒頭為條件。</p>}
           <p className="mt-2 text-xs text-muted-foreground">取向依據：{{ unitDoor: '自家大門', balcony: '陽台／採光面', buildingDoor: '大樓正門' }[house.facingBasis]}（各派有別）</p>
         </section>

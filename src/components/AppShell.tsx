@@ -1,19 +1,17 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { BookOpen, ChevronLeft, Compass, FileText, Home, LayoutGrid, MoreHorizontal, ScanLine, ShieldCheck, Trees, Users, X } from 'lucide-react'
+import { BookOpen, ChevronLeft, Compass, FileText, Home, LayoutGrid, MoreHorizontal, ShieldCheck, Trees, X } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { Button } from './mds'
 
 const NAV = [
-  { to: '/', label: '首頁', icon: Home, end: true },
-  { to: '/setup', label: '資料', icon: Users },
+  { to: '/', label: '看房', icon: Home, end: true },
+  { to: '/report', label: '怎麼做', icon: FileText },
   { to: '/plan', label: '平面圖', icon: LayoutGrid },
-  { to: '/report', label: '報告', icon: FileText },
 ] as const
 
 const MORE = [
   { to: '/compass', label: '羅盤量向', desc: '站在大門內側量朝向', icon: Compass },
-  { to: '/scan', label: '空間掃描', desc: '用手機鏡頭建立平面圖', icon: ScanLine },
   { to: '/environment', label: '外局問卷', desc: '路沖、壁刀等屋外環境', icon: Trees },
   { to: '/knowledge', label: '知識庫', desc: '八宅、飛星、二十四山、規則庫', icon: BookOpen },
   { to: '/privacy', label: '隱私與免責', desc: '資料存放位置與使用限制', icon: ShieldCheck },
@@ -25,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col bg-app-shell">
       <main className="flex-1 pb-[calc(3.75rem+env(safe-area-inset-bottom))]">{children}</main>
-      {!loc.pathname.startsWith('/story') && !loc.pathname.startsWith('/start') && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-surface-border bg-surface/95 backdrop-blur safe-b no-print">
+      {loc.pathname !== '/' && !loc.pathname.startsWith('/story') && !loc.pathname.startsWith('/start') && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-surface-border bg-surface/95 backdrop-blur safe-b no-print">
         <ul className="mx-auto flex max-w-2xl">
           {NAV.map((t) => (
             <li key={t.to} className="flex-1">

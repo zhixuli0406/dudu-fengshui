@@ -60,7 +60,7 @@ export function StartPage() {
   const move = (m: Move) => { setLite({ stepId: m.id, pendingId: m.pendingId, floorIdx: m.floorIdx ?? lite.floorIdx ?? 0 }); setAdding(false) }
   const goTo = (id: StepId) => move({ id })
   const later = (m: Move) => window.setTimeout(() => move(m), 380)
-  const back = () => { const p = prevStep(step, ctx); if (p) move(p); else nav('/') }
+  const back = () => { const p = prevStep(step, ctx); if (p) move(p); else nav('/report') }
   const { n, total } = progressOf(step)
   const pendingRoom = floorPlan?.rooms.find((r) => r.id === lite.pendingId)
   const owner = persons[0]

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, Plus, Redo2, RotateCcw, RotateCw, ScanLine, Share2, Sparkles, Square, Trash2, Undo2, X } from 'lucide-react'
+import { Camera, ChevronUp, Eye, Image as ImageIcon, MoreHorizontal, MousePointer2, PenLine, Plus, Redo2, RotateCcw, RotateCw, Share2, Sparkles, Square, Trash2, Undo2, X } from 'lucide-react'
 import { PlanEditor, type EditorMode } from '../components/PlanEditor'
 import { Page as _Page, PageHeader } from '../components/AppShell'
 import { Badge, Button, Input, NativeSelect, Segmented } from '../components/mds'
@@ -31,8 +31,10 @@ const MODES: { value: EditorMode; label: string; icon: typeof PenLine }[] = [
 ]
 
 export function PlanPage() {
-  const { plan, floors, activeFloor, setActiveFloor, addFloor, removeFloor, updatePlan, addRoom, updateRoom, removeRoom, addItem, updateItem, removeItem, setPlan, setFloors, house, setHouse, persons, settings, setSettings } = useAppStore()
+  const { plan, floors, activeFloor, setActiveFloor, addFloor, removeFloor, updatePlan, addRoom, updateRoom, removeRoom, addItem, updateItem, removeItem, setPlan, setFloors, house, setHouse, persons, settings, setSettings, setLite } = useAppStore()
   const nav = useNavigate()
+  /** hand the current floor back to the master's walk-through (camera or sketch) */
+  const rebuild = () => { setLite({ stepId: 'build', pendingId: undefined, floorIdx: activeFloor }); nav('/start') }
   const [params] = useSearchParams()
   const [mode, setMode] = useState<EditorMode>((params.get('mode') as EditorMode | null) ?? (plan.outline.length >= 3 ? 'select' : 'outline'))
   const [roomType, setRoomType] = useState<RoomType>('living')
@@ -148,10 +150,9 @@ export function PlanPage() {
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center px-4">
             <div className="pointer-events-auto max-w-sm rounded-xl border border-surface-border bg-surface/95 p-3 text-sm shadow-[var(--menu-shadow)] backdrop-blur">
               <div className="font-medium">還沒有平面圖</div>
-              <p className="mt-1 text-xs text-muted-foreground">最快的方式是用精靈，幾步就完成；這裡是進階的手繪與微調工具。</p>
-              <Button variant="brand" className="mt-2 w-full" onClick={() => nav('/plan/wizard')}><Sparkles />用精靈建立</Button>
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
-                <Button variant="outline" size="sm" onClick={() => nav('/scan')}><ScanLine />掃描</Button>
+              <p className="mt-1 text-xs text-muted-foreground">最快的方式是跟師傅走一圈（鏡頭或畫的），這裡是進階的手繪與微調工具。</p>
+              <Button variant="brand" className="mt-2 w-full" onClick={rebuild}><Sparkles />跟師傅建圖</Button>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
                 <Button variant="outline" size="sm" onClick={() => { setMode('calibrate'); fileRef.current?.click() }}><ImageIcon />拍照描圖</Button>
                 <Button variant="outline" size="sm" onClick={() => { setFloors([demoPlan()]); setHouse({ facingBearing: 180, facingSource: 'manual' }); setMode('select') }}>範例</Button>
               </div>
@@ -266,8 +267,7 @@ export function PlanPage() {
             {sheet === 'menu' && (
               <div className="space-y-2 text-sm">
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="brandSubtle" onClick={() => { setSheet('none'); nav('/plan/wizard') }}><Sparkles />用精靈重新建立</Button>
-                  <Button variant="outline" onClick={() => { setSheet('none'); nav('/scan') }}><ScanLine />空間掃描</Button>
+                  <Button variant="brandSubtle" onClick={() => { setSheet('none'); rebuild() }}><Sparkles />跟師傅重新建圖</Button>
                   <Button variant="outline" onClick={() => { setSheet('none'); setMode('calibrate'); fileRef.current?.click() }}><ImageIcon />拍照描圖</Button>
                   <Button variant="outline" onClick={() => { addFloor({ copyOutline: true }); setMode('room'); setSheet('none') }}>新增樓層（複製外牆）</Button>
                   <Button variant="outline" onClick={() => { if (floors.some((f) => f.outline.length) && !confirm('載入範例會取代目前所有樓層，確定？')) return; setFloors([demoPlan()]); setHouse({ facingBearing: 180, facingSource: 'manual' }); setMode('select'); setSheet('none') }}>載入範例</Button>

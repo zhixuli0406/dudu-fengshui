@@ -32,7 +32,7 @@ src/store/         zustand + localStorage 持久化
 
 ## 設計系統
 
-沿用 DuDuClaw MDS：`src/index.css` 定義 OKLCH 語義 token（`--app-shell`／`--page-canvas`／`--surface`／`--surface-raised` 四層、`--brand` 玉綠同時作為「吉」、`--destructive` 玫紅作為「凶」、五行色只用於宮位淡色），`@theme inline` 映射成 Tailwind utility；dark 走 `.dark` class（main.tsx 依 `prefers-color-scheme` 切換）。元件在 `src/components/mds/`（button／badge／card／input／segmented／empty／field），頁面只組合元件；圖示用 lucide-react 具名匯入，禁 emoji；字重只用 400／500。`AppShell` 提供固定底部導覽（首頁／資料／平面圖／報告／更多）與 `PageHeader`。
+沿用 DuDuClaw MDS：`src/index.css` 定義 OKLCH 語義 token（`--app-shell`／`--page-canvas`／`--surface`／`--surface-raised` 四層、`--brand` 玉綠同時作為「吉」、`--destructive` 玫紅作為「凶」、五行色只用於宮位淡色），`@theme inline` 映射成 Tailwind utility；一律深色（main.tsx 固定加 `.dark`，讓工具頁與師傅看房同一個調子）。元件在 `src/components/mds/`（button／badge／card／input／segmented／empty／field），頁面只組合元件；圖示用 lucide-react 具名匯入，禁 emoji；字重只用 400／500。`AppShell` 提供固定底部導覽（看房／怎麼做／平面圖／更多），在 `/`、`/start`、`/story` 隱藏；`PageHeader` 給工具頁用。路由：`/` 與 `/start` 都是師傅看房（`StartPage`），`/report`、`/plan`、`/story`、`/environment`、`/compass`、`/knowledge`、`/privacy`，其餘導回 `/`。舊的首頁步驟清單、資料頁、平面圖精靈頁、掃描頁已移除，功能併入引導（家人、朝向、建圖）與報告頁（判法設定）。
 
 ## 座標與方位約定
 
@@ -61,12 +61,12 @@ src/store/         zustand + localStorage 持久化
 
 ## AR 掃描流程
 
-`startARSession` 以階段狀態機捕捉：`outline`（外牆多邊形）→ `room`（每個房間一個多邊形，帶類型標籤）→ `opening`（大門／房門／窗的點）。overlay root 掛 `beforexrselect` 阻止 UI 點擊觸發 XR `select`。Chrome 平面偵測時，水平面取最大且高度 < 0.4 m 者為地板，垂直面投影成牆線供小地圖參考。`ScanPage.finish()` 把多邊形轉成 cm、以外牆最小點歸零、修正為順時針，門窗依最近外牆邊取法線（朝屋內）作為 facing，大門存在時以其反向＋北偏角設定房屋朝向。
+`startARSession` 以階段狀態機捕捉：`outline`（外牆多邊形）→ `room`（每個房間一個多邊形，帶類型標籤）→ `opening`（大門／房門／窗的點）→ `item`（家具的點，含鏡頭 yaw）。入口是引導的 `guide/WalkStep.tsx`。overlay root 掛 `beforexrselect` 阻止 UI 點擊觸發 XR `select`。Chrome 平面偵測時，水平面取最大且高度 < 0.4 m 者為地板，垂直面投影成牆線供小地圖參考。`ar/toPlan.ts` 的 `captureToPlan` 把多邊形轉成 cm、以外牆最小點歸零、修正為順時針，門窗依最近的牆取法線（朝內）作為 facing，家具依最近的牆定朝向；`facingFromPlan` 由大門反向＋北偏角得房屋朝向。
 
 ## AR 分層
 
 - Tier 1：原生 WebXR `immersive-ar` + hit-test（Chrome Android、Samsung Internet、Quest、visionOS Safari）。Chrome 147+ 另用 `plane-detection` 顯示地板並可 `initiateRoomCapture()`。
-- Tier 2：iOS 用 Variant Launch。`main.tsx` 在 iOS 且 `VITE_VARIANT_LAUNCH_KEY` 存在時提早注入 `https://launchar.app/sdk/v1?key=…`（不帶 `redirect=true`，由掃描頁決定何時交棒）；SDK 觸發 `vlaunch-initialized`，`detail.webXRStatus` 為 `supported`（已在 Launch 檢視器內，直接走 Tier 1）／`launch-required`（按鈕以 `launchUrl` 交棒 App Clip）／`unsupported`。`startARSession` 只硬性要求 `hit-test`，`local-floor` 為選配（Launch 檢視器可能只給 `local`），參考空間依 `session.enabledFeatures` 決定。Variant Launch 的 DOM overlay 是「隱藏 overlay root 以外所有元素」模擬的，故 overlay root 為 React 樹外的 `#ar-overlay-root`，UI 以 `createPortal` 渲染；session 期間 `html.ar-active` 讓 body／#root 背景透明（iOS 相機在網頁後方）；`vlaunch-ar-tracking` 狀態轉成中文提示（特徵不足→對準有紋理地面）。Zappar 因自架僅限 Enterprise 且 github.io 不在授權白名單而排除；8th Wall（2026 起開源免費、可自架）為第二 fallback，但需 6.6 MB 與另一套 renderer 管線、尺度需使用者校正，故未整合。
+- Tier 2：iOS 用 Variant Launch。`main.tsx` 在 iOS 且 `VITE_VARIANT_LAUNCH_KEY` 存在時提早注入 `https://launchar.app/sdk/v1?key=…`（不帶 `redirect=true`，由引導的建圖步驟決定何時交棒）；SDK 觸發 `vlaunch-initialized`，`detail.webXRStatus` 為 `supported`（已在 Launch 檢視器內，直接走 Tier 1）／`launch-required`（按鈕以 `launchUrl` 交棒 App Clip）／`unsupported`。`startARSession` 只硬性要求 `hit-test`，`local-floor` 為選配（Launch 檢視器可能只給 `local`），參考空間依 `session.enabledFeatures` 決定。Variant Launch 的 DOM overlay 是「隱藏 overlay root 以外所有元素」模擬的，故 overlay root 為 React 樹外的 `#ar-overlay-root`，UI 以 `createPortal` 渲染；session 期間 `html.ar-active` 讓 body／#root 背景透明（iOS 相機在網頁後方）；`vlaunch-ar-tracking` 狀態轉成中文提示（特徵不足→對準有紋理地面）。Zappar 因自架僅限 Enterprise 且 github.io 不在授權白名單而排除；8th Wall（2026 起開源免費、可自架）為第二 fallback，但需 6.6 MB 與另一套 renderer 管線、尺度需使用者校正，故未整合。
 - Tier 3：`FloorPlan.underlay` 照片底圖（縮圖 ≤ 1600px JPEG 存 localStorage）＋兩點比例校正；以及相機羅盤疊圖。全平台可用。
 
 ## 師傅來看房（/start，lite 模式）
@@ -76,9 +76,9 @@ src/store/         zustand + localStorage 持久化
 
 `engine/lite.ts`：`LiteRoom { type, palace, facing? }` 只記房間在哪一宮與關鍵家具朝向；`synthesizePlan(facing, rooms)` 合成 9×9 m 北上示意屋（大門在朝向那一側、房間佔對應宮位的 3×3 格、家具置中並依 facing 轉向，`plan.synthetic = true`）。`store.resolveAnalysisPlan()` 在沒有真實平面圖時回傳示意屋；`buildReport` 對 synthetic 跳過形勢規則並改用三維度加權。
 
-## 平面圖精靈
+## 草圖建圖（原平面圖精靈）
 
-`engine/wizard.ts`：`outlineFromDims`（方形／L 形外牆）、`doorOnWall`（門貼牆、朝屋內）、`gridCells`（外牆內的格子）、`cellsToRooms`（同類相鄰格子 flood-fill，`unionCells` 以邊界邊配對串成直角多邊形，失敗時退回逐格矩形）、`placeAgainstWall`（依物件慣例決定 facing：床頭／書桌朝牆，灶口／馬桶／沙發／神位背牆）、`roomDoorTowards`（房門開在朝屋中心那面牆）。精靈狀態存在 store `wizard`，完成時以 `setFloors` 寫入單一樓層。
+精靈頁已移除，改為引導裡的 size／paint 步驟；純函式沿用。`engine/wizard.ts`：`outlineFromDims`（方形／L 形外牆）、`doorOnWall`（門貼牆、朝屋內）、`gridCells`（外牆內的格子）、`cellsToRooms`（同類相鄰格子 flood-fill，`unionCells` 以邊界邊配對串成直角多邊形，失敗時退回逐格矩形）、`placeAgainstWall`（依物件慣例決定 facing：床頭／書桌朝牆，灶口／馬桶／沙發／神位背牆）、`roomDoorTowards`（房門開在朝屋中心那面牆）。狀態存在 store `wizard`，`engine/wizardPlan.ts` 推成 `FloorPlan` 後寫入對應樓層。
 
 ## 多樓層
 

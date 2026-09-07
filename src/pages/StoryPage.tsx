@@ -74,7 +74,7 @@ export function StoryPage() {
       <div ref={mountRef} className="absolute inset-0" />
       {!hasPlan && (
         <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-zinc-300">
-          <div>還沒有房間資料，師傅沒辦法看房。<div className="mt-3 flex justify-center gap-2"><Link to="/start"><Button variant="brand">跟師傅從大門開始</Button></Link><Link to="/plan/wizard"><Button variant="outline">畫平面圖</Button></Link></div></div>
+          <div>還沒有房間資料，師傅沒辦法看房。<div className="mt-3 flex justify-center gap-2"><Link to="/start"><Button variant="brand">跟師傅從大門開始</Button></Link><Link to="/plan"><Button variant="outline">自己畫平面圖</Button></Link></div></div>
         </div>
       )}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/70 to-transparent" />
