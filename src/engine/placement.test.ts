@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { edgeBearing, edgeDirectionZh, nearestEdge, placeAtWall } from './placement'
+import { edgeBearing, edgeDirectionZh, nearestEdge, placeAtWall, rayToWall, wallContext } from './placement'
 import type { Room } from './floorplan'
 
 const square: Room = { id: 'r', type: 'master', polygon: [{ x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 400 }, { x: 0, y: 400 }] }
@@ -52,5 +52,31 @@ describe('edgeBearing', () => {
     expect(edgeBearing(square.polygon, 3, 0)).toBe(270)
     expect(edgeDirectionZh(square.polygon, 0, 230)).toBe('西南')
     expect(edgeDirectionZh(diamond.polygon, 0, 0)).toBe('東北')
+  })
+})
+
+describe('rayToWall', () => {
+  it('hits the wall the phone points at from the middle of the room', () => {
+    const from = { x: 200, y: 200 }
+    expect(rayToWall(square.polygon, from, 0)).toEqual({ i: 0, q: { x: 200, y: 0 } })
+    expect(rayToWall(square.polygon, from, 90)!.i).toBe(1)
+    expect(rayToWall(square.polygon, from, 180)!.i).toBe(2)
+    const corner = rayToWall(square.polygon, from, 30)!
+    expect(corner.i).toBe(0)
+    expect(corner.q.x).toBeCloseTo(200 + 200 * Math.tan(Math.PI / 6), 3)
+    expect(rayToWall(diamond.polygon, from, 45)!.i).toBe(0)
+  })
+})
+
+describe('wallContext', () => {
+  it('says what is beyond each wall and whether it has a door or window', () => {
+    const living: Room = { id: 'l', type: 'living', polygon: [{ x: 400, y: 0 }, { x: 800, y: 0 }, { x: 800, y: 400 }, { x: 400, y: 400 }] }
+    const plan = { rooms: [square, living], items: [
+      { id: 'd', type: 'door' as const, x: 360, y: 195, w: 80, h: 10, facing: 270, roomId: 'r' },
+      { id: 'w', type: 'window' as const, x: 140, y: -5, w: 120, h: 10, facing: 180, roomId: 'r' },
+    ] }
+    expect(wallContext(plan, square, 1)).toMatchObject({ neighbor: { id: 'l' }, door: true, window: false })
+    expect(wallContext(plan, square, 0)).toMatchObject({ neighbor: null, door: false, window: true })
+    expect(wallContext(plan, square, 3)).toMatchObject({ neighbor: null, door: false, window: false })
   })
 })

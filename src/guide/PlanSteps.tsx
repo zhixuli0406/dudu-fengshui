@@ -4,7 +4,9 @@ import { NorthArrow } from '../components/NorthArrow'
 import { ITEM_ZH, ROOM_ZH, type FloorPlan, type Item, type ItemType, type Room, type RoomType } from '../engine/floorplan'
 import type { Corner } from '../engine/wizard'
 import type { DerivedPlan } from '../engine/wizardPlan'
-import { edgeDirectionZh, placeAtWall } from '../engine/placement'
+import { edgeDirectionZh, placeAtWall, rayToWall, wallContext } from '../engine/placement'
+import { useCompass } from '../hooks/useCompass'
+import { useAppStore } from '../store/useAppStore'
 import { bbox, polygonCentroid, rectCorners } from '../engine/geometry'
 import type { WizardState } from '../store/useAppStore'
 import { BRUSHES } from './script'
@@ -72,17 +74,21 @@ export function PaintStep({ wizard, setWizard, derived, onDone, onSkip }: { wiza
 }
 
 /**
- * Where the key piece of one room is: the room is shown on its own, you stand in the middle, and you tap
- * the stretch of wall it is against (any polygon, any angle, corners included). Bed head / desk face that
- * wall, everything else has its back to it; each wall is labelled with its compass direction.
+ * Where the key piece of one room is. The room is shown on its own with a small whole-floor inset for
+ * bearings, each wall labelled by what people actually recognise (door, window, which room is behind it)
+ * plus its compass direction. Two ways to answer: lay the phone flat and point it at the piece (the compass
+ * picks the wall), or tap the stretch of wall. Bed head / desk face that wall, everything else backs onto it.
  */
 export function RoomTapStep({ room, plan, itemType, onPlace, onSkip }: { room: Room; plan: FloorPlan; itemType: ItemType; onPlace: (item: Omit<Item, 'id'>) => void; onSkip: () => void }) {
   const [placed, setPlaced] = useState<ReturnType<typeof placeAtWall>>(null)
+  const [aiming, setAiming] = useState(false)
+  const compass = useCompass()
+  const settings = useAppStore((st) => st.settings)
   const b = bbox(room.polygon)
-  const pad = Math.max(90, Math.max(b.maxX - b.minX, b.maxY - b.minY) * 0.28)
+  const pad = Math.max(120, Math.max(b.maxX - b.minX, b.maxY - b.minY) * 0.32)
   const vb = { x: b.minX - pad, y: b.minY - pad, w: b.maxX - b.minX + pad * 2, h: b.maxY - b.minY + pad * 2 }
   const c = polygonCentroid(room.polygon)
-  const fs = Math.max(vb.w, vb.h) / 20
+  const fs = Math.max(vb.w, vb.h) / 22
   const name = ITEM_ZH[itemType].split('／')[0]!
   const headWord = itemType === 'bed' ? '床頭' : itemType === 'desk' ? '書桌' : name
   const toPlan = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -95,23 +101,49 @@ export function RoomTapStep({ room, plan, itemType, onPlace, onSkip }: { room: R
   const others = plan.items.filter((i) => i.roomId === room.id && i.type !== itemType && i.type !== 'door' && i.type !== 'window')
   const dir = (deg: number) => ({ x: Math.sin((deg * Math.PI) / 180), y: -Math.cos((deg * Math.PI) / 180) })
   const pts = (it: { x: number; y: number; w: number; h: number; facing: number }) => rectCorners(it).map((q) => `${q.x},${q.y}`).join(' ')
+  const walls = room.polygon.map((a, i) => {
+    const bq = room.polygon[(i + 1) % room.polygon.length]!
+    const ctx = wallContext(plan, room, i)
+    const parts = [ctx.door ? '門' : '', ctx.window ? '窗' : '', ctx.neighbor ? `${ROOM_ZH[ctx.neighbor.type]}那邊` : '外牆'].filter(Boolean)
+    return { i, a, b: bq, len: Math.hypot(bq.x - a.x, bq.y - a.y), context: parts.join('・'), dirZh: edgeDirectionZh(room.polygon, i, plan.northOffset) }
+  })
+  const outwardAt = (i: number) => {
+    const w = walls[i]!
+    let n = { x: -(w.b.y - w.a.y), y: w.b.x - w.a.x }
+    const len = Math.hypot(n.x, n.y) || 1
+    n = { x: n.x / len, y: n.y / len }
+    const mid = { x: (w.a.x + w.b.x) / 2, y: (w.a.y + w.b.y) / 2 }
+    if ((c.x - mid.x) * n.x + (c.y - mid.y) * n.y > 0) n = { x: -n.x, y: -n.y }
+    return { n, mid }
+  }
+  // compass aiming: bearing → plan angle; the wall the ray from the middle of the room hits
+  const heading = compass.heading == null ? null : settings.useTrueNorth ? (((compass.heading + settings.declination) % 360) + 360) % 360 : compass.heading
+  const aimAngle = heading == null ? null : (((heading - plan.northOffset) % 360) + 360) % 360
+  const aimHit = aiming && aimAngle != null ? rayToWall(room.polygon, c, aimAngle) : null
+  const compassUsable = compass.status !== 'unsupported' && compass.status !== 'denied'
+  const wallLabel = (i: number) => `${walls[i]!.context}（${walls[i]!.dirZh}）`
   return (
     <div className="space-y-3">
-      <p className="text-sm text-zinc-300">站在{ROOM_ZH[room.type]}中央看。點{headWord}靠的那一段牆；靠角落就點靠角落的位置。</p>
-      <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} data-vb={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet" className="w-full max-h-[44vh] cursor-crosshair touch-none rounded-xl border border-white/10 bg-white/[0.03]" role="img" aria-label={`${ROOM_ZH[room.type]}平面`} onPointerDown={(e) => setPlaced(placeAtWall(room, itemType, toPlan(e)))}>
+      <Overview plan={plan} room={room} />
+      <p className="text-sm text-zinc-300">{aiming ? `手機平放、機頂對準${headWord}，看畫面上亮起的是哪面牆。` : `站在${ROOM_ZH[room.type]}中央。牆上寫的是那面牆有什麼；點${headWord}靠的那一段牆，或用手機對準它。`}</p>
+      <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} data-vb={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} preserveAspectRatio="xMidYMid meet" className="w-full max-h-[40vh] cursor-crosshair touch-none rounded-xl border border-white/10 bg-white/[0.03]" role="img" aria-label={`${ROOM_ZH[room.type]}平面`} onPointerDown={(e) => { setAiming(false); setPlaced(placeAtWall(room, itemType, toPlan(e))) }}>
         <polygon points={room.polygon.map((q) => `${q.x},${q.y}`).join(' ')} fill="color-mix(in oklch, var(--brand) 14%, transparent)" stroke="rgba(255,255,255,0.75)" strokeWidth={fs / 5} strokeLinejoin="round" />
-        {room.polygon.map((a, i) => {
-          const bq = room.polygon[(i + 1) % room.polygon.length]!
-          const mid = { x: (a.x + bq.x) / 2, y: (a.y + bq.y) / 2 }
-          let n = { x: -(bq.y - a.y), y: bq.x - a.x }
-          const len = Math.hypot(n.x, n.y) || 1
-          n = { x: n.x / len, y: n.y / len }
-          if ((c.x - mid.x) * n.x + (c.y - mid.y) * n.y > 0) n = { x: -n.x, y: -n.y }
-          if (Math.hypot(bq.x - a.x, bq.y - a.y) < fs * 2) return null
-          return <text key={i} x={mid.x + n.x * fs * 1.1} y={mid.y + n.y * fs * 1.1 + fs * 0.35} textAnchor="middle" fontSize={fs * 0.85} fill="rgba(255,255,255,0.55)">{edgeDirectionZh(room.polygon, i, plan.northOffset)}</text>
+        {aimHit && <line x1={walls[aimHit.i]!.a.x} y1={walls[aimHit.i]!.a.y} x2={walls[aimHit.i]!.b.x} y2={walls[aimHit.i]!.b.y} stroke="var(--brand)" strokeWidth={fs / 2.5} strokeLinecap="round" />}
+        {walls.map((w) => {
+          if (w.len < fs * 2.2) return null
+          const { n, mid } = outwardAt(w.i)
+          const p1 = { x: mid.x + n.x * fs * 1.0, y: mid.y + n.y * fs * 1.0 }
+          const hot = aimHit?.i === w.i
+          return (
+            <g key={w.i}>
+              <text x={p1.x} y={p1.y + fs * 0.35} textAnchor="middle" fontSize={fs * 0.9} fontWeight={hot ? 600 : 500} fill={hot ? 'var(--brand)' : '#efe7d6'}>{w.context}</text>
+              <text x={p1.x + n.x * fs * 1.1} y={p1.y + n.y * fs * 1.1 + fs * 0.35} textAnchor="middle" fontSize={fs * 0.7} fill="rgba(255,255,255,0.5)">{w.dirZh}</text>
+            </g>
+          )
         })}
-        {openings.map((i) => <polygon key={i.id} points={pts(i)} fill="#efe7d6" stroke="none" />)}
+        {openings.map((i) => <g key={i.id}><polygon points={pts(i)} fill="#efe7d6" stroke="none" /><text x={i.x + i.w / 2} y={i.y + i.h / 2 + fs * 0.3} textAnchor="middle" fontSize={fs * 0.75} fill="#efe7d6">{i.type === 'door' ? '門' : '窗'}</text></g>)}
         {others.map((i) => <g key={i.id}><polygon points={pts(i)} fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.35)" strokeWidth={fs / 10} /><text x={i.x + i.w / 2} y={i.y + i.h / 2 + fs * 0.3} textAnchor="middle" fontSize={fs * 0.8} fill="rgba(255,255,255,0.6)">{ITEM_ZH[i.type][0]}</text></g>)}
+        {aimHit && <line x1={c.x} y1={c.y} x2={aimHit.q.x} y2={aimHit.q.y} stroke="var(--brand)" strokeWidth={fs / 8} strokeDasharray={`${fs / 3} ${fs / 4}`} />}
         <circle cx={c.x} cy={c.y} r={fs * 0.9} fill="var(--brand)" />
         <text x={c.x} y={c.y + fs * 0.32} textAnchor="middle" fontSize={fs * 0.9} fill="var(--brand-foreground)">你</text>
         {placed && (() => {
@@ -127,11 +159,40 @@ export function RoomTapStep({ room, plan, itemType, onPlace, onSkip }: { room: R
           )
         })()}
       </svg>
-      {placed
-        ? <button className={choiceCls(true)} onClick={() => { const { edge, ...item } = placed; void edge; onPlace(item) }}>{headWord}靠{edgeDirectionZh(room.polygon, placed.edge.i, plan.northOffset)}牆，就這樣</button>
-        : <p className="text-center text-xs text-zinc-500">還沒點。點了會先畫給你看，再確認。</p>}
+      {aiming ? (
+        <div className="space-y-2">
+          <button className={choiceCls(true, 'disabled:opacity-40')} disabled={!aimHit} onClick={() => { if (aimHit) { setPlaced(placeAtWall(room, itemType, aimHit.q)); setAiming(false) } }}>{aimHit ? `就是這面：${wallLabel(aimHit.i)}` : compass.status === 'active' ? '對準了再按' : '等羅盤讀數…'}</button>
+          <p className="text-center text-xs text-zinc-500">{compass.status === 'active' ? (compass.stability < 8 ? '讀數穩定' : '讀數飄動，遠離金屬') : '感測器啟動中'}・或直接點圖上的牆</p>
+        </div>
+      ) : placed ? (
+        <button className={choiceCls(true)} onClick={() => { const { edge, ...item } = placed; void edge; onPlace(item) }}>{headWord}靠{wallLabel(placed.edge.i)}，就這樣</button>
+      ) : compassUsable ? (
+        <button className={choiceCls()} onClick={async () => { if (compass.status === 'need-permission') await compass.requestPermission(); setAiming(true) }}>手機對準{headWord}，我來認牆</button>
+      ) : (
+        <p className="text-center text-xs text-zinc-500">點圖上的牆，會先畫給你看再確認。</p>
+      )}
       <Escape label="不確定，先略過" onPick={onSkip} />
     </div>
+  )
+}
+
+/** The whole floor, small, with this room lit up and the main door marked: the bearings people actually have. */
+function Overview({ plan, room }: { plan: FloorPlan; room: Room }) {
+  if (plan.outline.length < 3) return null
+  const b = bbox(plan.outline)
+  const pad = 40
+  const w = b.maxX - b.minX + pad * 2, h = b.maxY - b.minY + pad * 2
+  const fs = Math.max(w, h) / 18
+  const door = plan.items.find((i) => i.type === 'mainDoor') ?? plan.items.find((i) => i.type === 'stairs')
+  const rc = polygonCentroid(room.polygon)
+  return (
+    <svg viewBox={`${b.minX - pad} ${b.minY - pad} ${w} ${h}`} preserveAspectRatio="xMidYMid meet" className="h-24 w-full rounded-lg bg-white/[0.03]" aria-hidden>
+      {plan.rooms.map((r) => r.polygon.length >= 3 && <polygon key={r.id} points={r.polygon.map((q) => `${q.x},${q.y}`).join(' ')} fill={r.id === room.id ? 'color-mix(in oklch, var(--brand) 45%, transparent)' : 'rgba(255,255,255,0.04)'} stroke="rgba(255,255,255,0.3)" strokeWidth={fs / 8} />)}
+      <polygon points={plan.outline.map((q) => `${q.x},${q.y}`).join(' ')} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={fs / 5} strokeLinejoin="round" />
+      {door && <text x={door.x + door.w / 2} y={door.y + door.h / 2 + fs * 0.35} textAnchor="middle" fontSize={fs} fill="#efe7d6">{door.type === 'stairs' ? '梯' : '門'}</text>}
+      <text x={rc.x} y={rc.y + fs * 0.35} textAnchor="middle" fontSize={fs * 0.9} fill="var(--brand-foreground)">這間</text>
+      <NorthArrow plan={plan} />
+    </svg>
   )
 }
 

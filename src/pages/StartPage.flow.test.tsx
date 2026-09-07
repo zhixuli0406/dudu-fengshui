@@ -39,7 +39,7 @@ describe('師傅來看房 flow (sketch path, two floors)', () => {
     const svg = container.querySelector('main svg[data-vb]')!
     const [vx, vy] = svg.getAttribute('data-vb')!.split(' ').map(Number)
     act(() => { fireEvent.pointerDown(svg, { clientX: x - vx!, clientY: y - vy! }) })
-    click(/牆，就這樣$/)
+    click(/靠.*，就這樣$/)
   }
   const paint = (container: HTMLElement, brush: string, cells: number[]) => {
     click(brush)
